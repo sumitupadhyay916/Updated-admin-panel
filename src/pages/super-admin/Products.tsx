@@ -269,7 +269,10 @@ export default function ProductsManagement() {
     }).format(value);
   };
 
-  const columns: ColumnDef<Product>[] = useMemo(() => [
+  const columns: ColumnDef<Product>[] = useMemo(() => {
+    const isSeller = user?.role === 'seller';
+    
+    const allColumns: ColumnDef<Product>[] = [
     {
       id: 'select',
       header: ({ table }: { table: { getIsAllPageRowsSelected: () => boolean; toggleAllPageRowsSelected: (value: boolean) => void } }) => (
@@ -415,7 +418,15 @@ export default function ProductsManagement() {
         );
       },
     },
-  ], [openEditDialog, openDeleteDialog]);
+  ];
+
+    // Filter out Categories column for sellers
+    if (isSeller) {
+      return allColumns.filter(col => col.accessorKey !== 'categoryName');
+    }
+    
+    return allColumns;
+  }, [user, openEditDialog, openDeleteDialog]);
 
   const totalProducts = products.length;
   const availableProducts = products.filter(p => p.stock === 'available').length;

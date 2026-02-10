@@ -344,6 +344,7 @@ export interface DashboardStats {
   totalProducts: number;
   totalCustomers: number;
   totalSellers: number;
+  totalAdmins: number;
   pendingOrders: number;
   lowStockProducts: number;
   pendingPayouts: number;

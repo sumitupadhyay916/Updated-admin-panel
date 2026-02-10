@@ -123,7 +123,7 @@ export default function SellerDashboard() {
 
       {/* Balance Cards */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="bg-gradient-to-br from-green-500 to-emerald-600 text-white border-0">
+        {/* <Card className="bg-gradient-to-br from-green-500 to-emerald-600 text-white border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -143,7 +143,7 @@ export default function SellerDashboard() {
               <Link to="/seller/payouts">Request Payout</Link>
             </Button>
           </CardContent>
-        </Card>
+        </Card> */}
 
         <Card className="dark:border-gray-700 dark:bg-gray-800">
           <CardContent className="p-6">

@@ -107,7 +107,7 @@ export default function AdminDashboard() {
       <PageHeader
         title="Admin Dashboard"
         description="Manage sellers, products, and orders"
-        badge="Admin"
+        // badge="Admin"
         icon={Shield}
       />
 
@@ -303,18 +303,27 @@ export default function AdminDashboard() {
                   className="flex items-center justify-between rounded-lg border p-3 dark:border-gray-700"
                 >
                   <div className="flex items-center gap-3">
-                    <img
-                      src={product.images[0] || 'https://via.placeholder.com/50'}
-                      alt={product.name}
-                      className="h-10 w-10 rounded-lg object-cover"
-                    />
+                    {product.images && product.images.length > 0 ? (
+                      <img
+                        src={product.images[0]}
+                        alt={product.name}
+                        className="h-10 w-10 rounded-lg object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <div className="h-10 w-10 rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                        <Package className="h-5 w-5 text-gray-400" />
+                      </div>
+                    )}
                     <div>
                       <p className="font-medium text-gray-900 dark:text-white">{product.name}</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">{product.sellerName}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <StatusBadge status={product.status} />
+                    <StatusBadge status={product.stock} />
                     <Button variant="ghost" size="sm" asChild>
                       <Link to={`/admin/products`}>
                         <Eye className="h-4 w-4" />

@@ -58,8 +58,20 @@ const statusConfig: Record<string, { variant: 'default' | 'secondary' | 'destruc
 };
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
+  // Handle undefined or null status
+  if (!status) {
+    return (
+      <Badge
+        variant="secondary"
+        className={cn('bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300', className)}
+      >
+        Unknown
+      </Badge>
+    );
+  }
+
   const config = statusConfig[status.toLowerCase()] || {
-    variant: 'secondary',
+    variant: 'secondary' as const,
     className: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
     label: status,
   };
