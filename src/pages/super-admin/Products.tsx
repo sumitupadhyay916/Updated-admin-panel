@@ -45,7 +45,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
 
-const productFormSchema = z.object({
+// Schema for super_admin and admin (sellerId required)
+const productFormSchemaWithSeller = z.object({
   name: z.string().min(1, 'Product name is required').min(2, 'Product name must be at least 2 characters'),
   categoryId: z.string().min(1, 'Category is required'),
   sellerId: z.string().min(1, 'Seller is required'),
@@ -53,11 +54,22 @@ const productFormSchema = z.object({
   stock: z.enum(['available', 'unavailable']),
 });
 
-type ProductFormValues = z.infer<typeof productFormSchema>;
+// Schema for seller (sellerId not required, will be auto-set)
+const productFormSchemaWithoutSeller = z.object({
+  name: z.string().min(1, 'Product name is required').min(2, 'Product name must be at least 2 characters'),
+  categoryId: z.string().min(1, 'Category is required'),
+  sellerId: z.string().optional(),
+  price: z.number().min(0.01, 'Price must be greater than 0'),
+  stock: z.enum(['available', 'unavailable']),
+});
+
+type ProductFormValues = z.infer<typeof productFormSchemaWithSeller>;
 
 export default function ProductsManagement() {
   const { user } = useAuthStore();
+  const isSeller = user?.role === 'seller';
   const isAdmin = user?.role === 'admin';
+  const isSuperAdmin = user?.role === 'super_admin';
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [sellers, setSellers] = useState<Seller[]>([]);
@@ -71,7 +83,7 @@ export default function ProductsManagement() {
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<ProductFormValues>({
-    resolver: zodResolver(productFormSchema),
+    resolver: zodResolver(isSeller ? productFormSchemaWithoutSeller : productFormSchemaWithSeller),
     defaultValues: {
       name: '',
       categoryId: '',
@@ -82,7 +94,7 @@ export default function ProductsManagement() {
   });
 
   const editForm = useForm<ProductFormValues>({
-    resolver: zodResolver(productFormSchema),
+    resolver: zodResolver(isSeller ? productFormSchemaWithoutSeller : productFormSchemaWithSeller),
     defaultValues: {
       name: '',
       categoryId: '',
@@ -147,13 +159,19 @@ export default function ProductsManagement() {
   const handleCreateProduct = async (values: ProductFormValues) => {
     try {
       setIsLoading(true);
-      const response = await productsApi.createProduct({
+      const payload: any = {
         name: values.name,
         categoryId: parseInt(values.categoryId, 10),
-        sellerId: values.sellerId,
         price: values.price,
         stock: values.stock,
-      });
+      };
+      
+      // Only include sellerId for super_admin and admin
+      if (!isSeller && values.sellerId) {
+        payload.sellerId = values.sellerId;
+      }
+      
+      const response = await productsApi.createProduct(payload);
       if (response.success && response.data) {
         toast.success('Product created successfully');
         setIsAddDialogOpen(false);
@@ -200,13 +218,19 @@ export default function ProductsManagement() {
 
     try {
       setIsLoading(true);
-      const response = await productsApi.updateProduct(editingProduct.id, {
+      const payload: any = {
         name: values.name,
         categoryId: parseInt(values.categoryId, 10),
-        sellerId: values.sellerId,
         price: values.price,
         stock: values.stock,
-      });
+      };
+      
+      // Only include sellerId for super_admin and admin
+      if (!isSeller && values.sellerId) {
+        payload.sellerId = values.sellerId;
+      }
+      
+      const response = await productsApi.updateProduct(editingProduct.id, payload);
       if (response.success && response.data) {
         toast.success('Product updated successfully');
         setIsEditDialogOpen(false);
@@ -574,32 +598,34 @@ export default function ProductsManagement() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="sellerId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Seller</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a seller" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {sellers
-                          .filter(seller => seller.status === 'active')
-                          .map((seller) => (
-                            <SelectItem key={seller.id} value={seller.id}>
-                              {seller.businessName} ({seller.email})
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {!isSeller && (
+                <FormField
+                  control={form.control}
+                  name="sellerId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Seller</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a seller" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {sellers
+                            .filter(seller => seller.status === 'active')
+                            .map((seller) => (
+                              <SelectItem key={seller.id} value={seller.id}>
+                                {seller.businessName} ({seller.email})
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
               <FormField
                 control={form.control}
                 name="price"
@@ -732,32 +758,34 @@ export default function ProductsManagement() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={editForm.control}
-                name="sellerId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Seller</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a seller" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {sellers
-                          .filter(seller => seller.status === 'active')
-                          .map((seller) => (
-                            <SelectItem key={seller.id} value={seller.id}>
-                              {seller.businessName} ({seller.email})
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {!isSeller && (
+                <FormField
+                  control={editForm.control}
+                  name="sellerId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Seller</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a seller" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {sellers
+                            .filter(seller => seller.status === 'active')
+                            .map((seller) => (
+                              <SelectItem key={seller.id} value={seller.id}>
+                                {seller.businessName} ({seller.email})
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
               <FormField
                 control={editForm.control}
                 name="price"

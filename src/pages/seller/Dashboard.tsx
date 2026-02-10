@@ -117,7 +117,7 @@ export default function SellerDashboard() {
       <PageHeader
         title="Seller Dashboard"
         description={`Welcome back, ${seller?.businessName || seller?.name}`}
-        badge="Seller"
+        // badge="Seller"
         icon={Store}
       />
 
@@ -186,7 +186,7 @@ export default function SellerDashboard() {
           icon={ShoppingBag}
         />
         <StatCard
-          title="Products"
+          title="Total Products"
           value={stats.totalProducts}
           icon={Package}
         />
