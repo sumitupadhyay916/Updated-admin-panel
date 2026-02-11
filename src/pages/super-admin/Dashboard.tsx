@@ -159,8 +159,8 @@ export default function SuperAdminDashboard() {
           className="border-l-4 border-l-blue-500"
         />
         <StatCard
-          title="Open Queries"
-          value={stats?.openQueries || 0}
+          title="Total Category"
+          value={stats?.totalCategories || 0}
           icon={MessageSquare}
           className="border-l-4 border-l-purple-500"
         />

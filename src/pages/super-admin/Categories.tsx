@@ -5,6 +5,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { StatCard } from '@/components/ui/stat-card';
 import {
   Dialog,
   DialogContent,
@@ -34,7 +35,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Plus, Edit2, Trash2, Search, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, X, FolderOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -279,6 +280,16 @@ export default function Categories() {
         description="Manage product categories"
         badge={categories.length.toString()}
       />
+
+      {/* Total Categories Stat Card */}
+      <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-4">
+        <StatCard
+          title="Total Categories"
+          value={categories.length.toString()}
+          icon={FolderOpen}
+          className="border-l-4 border-l-blue-500"
+        />
+      </div>
 
       <Card>
         <CardContent className="pt-6">

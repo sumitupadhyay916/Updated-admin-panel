@@ -40,6 +40,7 @@ export default function SellerDashboard() {
   const [sellerOrders, setSellerOrders] = useState<Order[]>([]);
   const [sellerProducts, setSellerProducts] = useState<Product[]>([]);
   const [salesData, setSalesData] = useState<ChartData[]>([]);
+  const [myProductsCount, setMyProductsCount] = useState(0);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -67,11 +68,12 @@ export default function SellerDashboard() {
     const loadData = async () => {
       if (!user) return;
       try {
-        const [ordersRes, productsRes, revenueRes, ordersChartRes] = await Promise.all([
+        const [ordersRes, productsRes, revenueRes, ordersChartRes, dashboardRes] = await Promise.all([
           sellersApi.getSellerOrders(user.id, { page: 1, limit: 50 }),
           sellersApi.getSellerProducts(user.id, { page: 1, limit: 100 }),
           dashboardApi.getRevenueChart(),
           dashboardApi.getOrdersChart(),
+          dashboardApi.getSellerDashboard(),
         ]);
 
         if (ordersRes.success && Array.isArray(ordersRes.data)) {
@@ -79,6 +81,12 @@ export default function SellerDashboard() {
         }
         if (productsRes.success && Array.isArray(productsRes.data)) {
           setSellerProducts(productsRes.data as Product[]);
+        }
+        if (dashboardRes.success && dashboardRes.data) {
+          const dashData = dashboardRes.data as any;
+          if (typeof dashData.myProducts === 'number') {
+            setMyProductsCount(dashData.myProducts);
+          }
         }
         if (
           revenueRes.success &&
@@ -186,15 +194,15 @@ export default function SellerDashboard() {
           icon={ShoppingBag}
         />
         <StatCard
-          title="Total Products"
-          value={stats.totalProducts}
+          title="My Products"
+          value={myProductsCount}
           icon={Package}
         />
         <StatCard
           title="Pending Orders"
           value={stats.pendingOrders}
           icon={TrendingUp}
-          className="border-l-4 border-l-yellow-500"
+          // className="border-l-4 border-l-yellow-500"
         />
         <StatCard
           title="Average Rating"
@@ -377,7 +385,7 @@ export default function SellerDashboard() {
       </div>
 
       {/* Commission Info */}
-      <Card className="dark:border-gray-700 dark:bg-gray-800">
+      {/* <Card className="dark:border-gray-700 dark:bg-gray-800">
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
@@ -399,7 +407,7 @@ export default function SellerDashboard() {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
     </div>
   );
 }

@@ -17,6 +17,7 @@ import {
   ArrowRight,
   Eye,
   Shield,
+  MessageSquare,
 } from 'lucide-react';
 import {
   LineChart,
@@ -115,19 +116,19 @@ export default function AdminDashboard() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Revenue"
-          value={stats ? formatCurrency(stats.totalRevenue) : 'Loading...'}
+          value={stats ? formatCurrency(stats.totalRevenue) : '0'}
           change={stats?.revenueChange}
           icon={DollarSign}
         />
         <StatCard
           title="Total Orders"
-          value={stats?.totalOrders.toLocaleString() || 'Loading...'}
+          value={stats?.totalOrders.toLocaleString() || '0'}
           change={stats?.ordersChange}
           icon={ShoppingBag}
         />
         <StatCard
           title="Total Products"
-          value={stats?.totalProducts.toLocaleString() || 'Loading...'}
+          value={stats?.totalProducts.toLocaleString() || '0'}
           icon={Package}
         />
         <StatCard
@@ -152,10 +153,10 @@ export default function AdminDashboard() {
           className="border-l-4 border-l-orange-500"
         />
         <StatCard
-          title="Low Stock Items"
-          value={stats?.lowStockProducts || 0}
-          icon={AlertTriangle}
-          className="border-l-4 border-l-red-500"
+          title="Total Category"
+          value={stats?.totalCategories || 0}
+          icon={MessageSquare}
+          className="border-l-4 border-l-blue-500"
         />
       </div>
 

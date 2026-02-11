@@ -178,9 +178,6 @@ export default function Login() {
 
         <CardFooter className="flex flex-col gap-4">
           <div className="flex items-center justify-between w-full">
-            <Badge variant="outline" className="text-xs dark:border-gray-700 dark:text-gray-400">
-              Demo Mode
-            </Badge>
             <button
               onClick={toggleTheme}
               className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
