@@ -245,7 +245,7 @@ export default function SuperAdminDashboard() {
         {/* Category Distribution */}
         <Card className="dark:border-gray-700 dark:bg-gray-800">
           <CardHeader>
-            <CardTitle className="dark:text-white">Sales by Deity</CardTitle>
+            <CardTitle className="dark:text-white">Sales by Each Category</CardTitle>
             <CardDescription className="dark:text-gray-400">
               Product category distribution
             </CardDescription>

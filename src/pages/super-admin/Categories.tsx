@@ -278,7 +278,7 @@ export default function Categories() {
       <PageHeader
         title="Categories"
         description="Manage product categories"
-        badge={categories.length.toString()}
+        // badge={categories.length.toString()}
       />
 
       {/* Total Categories Stat Card */}

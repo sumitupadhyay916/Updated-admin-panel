@@ -44,18 +44,9 @@ import {
   CheckCircle, 
   Trash2, 
   Shield,
-  MoreHorizontal,
   Phone,
   FolderTree,
 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 
 const adminFormSchema = z.object({
@@ -352,52 +343,52 @@ export default function AdminManagement() {
     },
     {
       id: 'actions',
+      header: 'Actions',
       cell: ({ row }: { row: { original: Admin } }) => {
         const admin = row.original;
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="dark:border-gray-700 dark:bg-gray-800">
-              <DropdownMenuLabel className="dark:text-gray-300">Actions</DropdownMenuLabel>
-              <DropdownMenuSeparator className="dark:border-gray-700" />
-              <DropdownMenuItem onClick={() => openEditDialog(admin)} className="dark:text-gray-300">
-                <Edit2 className="mr-2 h-4 w-4" />
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => openCategoryDialog(admin)} className="dark:text-gray-300">
-                <FolderTree className="mr-2 h-4 w-4" />
-                Assign Categories
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => handleToggleStatus(admin)}
-                className={admin.status === 'active' ? 'text-red-600' : 'text-green-600'}
-              >
-                {admin.status === 'active' ? (
-                  <>
-                    <Ban className="mr-2 h-4 w-4" />
-                    Suspend
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="mr-2 h-4 w-4" />
-                    Activate
-                  </>
-                )}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="dark:border-gray-700" />
-              <DropdownMenuItem 
-                onClick={() => handleDeleteAdmin(admin.id)}
-                className="text-red-600"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => openEditDialog(admin)}
+              className="h-8 w-8 p-0"
+              title="Edit Admin"
+            >
+              <Edit2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => openCategoryDialog(admin)}
+              className="h-8 w-8 p-0"
+              title="Assign Categories"
+            >
+              <FolderTree className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleToggleStatus(admin)}
+              className={`h-8 w-8 p-0 ${admin.status === 'active' ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'}`}
+              title={admin.status === 'active' ? 'Suspend Admin' : 'Activate Admin'}
+            >
+              {admin.status === 'active' ? (
+                <Ban className="h-4 w-4" />
+              ) : (
+                <CheckCircle className="h-4 w-4" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDeleteAdmin(admin.id)}
+              className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+              title="Delete Admin"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         );
       },
     },

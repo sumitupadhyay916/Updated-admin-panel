@@ -47,18 +47,9 @@ import {
   Package,
   ShoppingBag,
   IndianRupee,
-  MoreHorizontal,
   Eye,
   TrendingUp,
 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 
 const createSellerFormSchema = (isSuperAdmin: boolean) => z.object({
   businessName: z.string().min(2, 'Business name must be at least 2 characters'),
@@ -406,44 +397,43 @@ export default function SellerManagement() {
       },
       {
         id: 'actions',
+        header: 'Actions',
         cell: ({ row }) => {
           const seller = row.original;
           return (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="dark:border-gray-700 dark:bg-gray-800">
-                <DropdownMenuLabel className="dark:text-gray-300">Actions</DropdownMenuLabel>
-                <DropdownMenuSeparator className="dark:border-gray-700" />
-                <DropdownMenuItem onClick={() => openViewDialog(seller)} className="dark:text-gray-300">
-                  <Eye className="mr-2 h-4 w-4" />
-                  View Details
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => openEditDialog(seller)} className="dark:text-gray-300">
-                  <Edit2 className="mr-2 h-4 w-4" />
-                  Edit
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => handleToggleStatus(seller)}
-                  className={seller.status === 'active' ? 'text-red-600' : 'text-green-600'}
-                >
-                  {seller.status === 'active' ? (
-                    <>
-                      <Ban className="mr-2 h-4 w-4" />
-                      Suspend
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="mr-2 h-4 w-4" />
-                      Activate
-                    </>
-                  )}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => openViewDialog(seller)}
+                className="h-8 w-8 p-0"
+                title="View Details"
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => openEditDialog(seller)}
+                className="h-8 w-8 p-0"
+                title="Edit Seller"
+              >
+                <Edit2 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleToggleStatus(seller)}
+                className={`h-8 w-8 p-0 ${seller.status === 'active' ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'}`}
+                title={seller.status === 'active' ? 'Suspend Seller' : 'Activate Seller'}
+              >
+                {seller.status === 'active' ? (
+                  <Ban className="h-4 w-4" />
+                ) : (
+                  <CheckCircle className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           );
         },
       }
