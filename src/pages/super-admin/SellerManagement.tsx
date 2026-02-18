@@ -49,6 +49,7 @@ import {
   IndianRupee,
   Eye,
   TrendingUp,
+  Trash2,
 } from 'lucide-react';
 
 const createSellerFormSchema = (isSuperAdmin: boolean) => z.object({
@@ -75,6 +76,8 @@ export default function SellerManagement() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedSeller, setSelectedSeller] = useState<Seller | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [sellerToDelete, setSellerToDelete] = useState<Seller | null>(null);
 
   useEffect(() => {
     const loadSellers = async () => {
@@ -278,6 +281,30 @@ export default function SellerManagement() {
     }
   };
 
+  const handleDeleteSeller = async () => {
+    if (!sellerToDelete) return;
+
+    try {
+      const response = await sellersApi.deleteSeller(sellerToDelete.id);
+      if (response.success) {
+        setSellers((prev) => prev.filter((s) => s.id !== sellerToDelete.id));
+        setIsDeleteDialogOpen(false);
+        setSellerToDelete(null);
+      } else {
+        alert(response.message || 'Failed to delete seller');
+      }
+    } catch (error: any) {
+      console.error('Failed to delete seller', error);
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to delete seller. Please try again.';
+      alert(`Error: ${errorMessage}`);
+    }
+  };
+
+  const openDeleteDialog = (seller: Seller) => {
+    setSellerToDelete(seller);
+    setIsDeleteDialogOpen(true);
+  };
+
   const openEditDialog = (seller: Seller) => {
     setSelectedSeller(seller);
     editForm.reset({
@@ -433,6 +460,17 @@ export default function SellerManagement() {
                   <CheckCircle className="h-4 w-4" />
                 )}
               </Button>
+              {isSuperAdmin && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => openDeleteDialog(seller)}
+                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                  title="Delete Seller"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           );
         },
@@ -669,6 +707,52 @@ export default function SellerManagement() {
           />
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px] dark:border-gray-700 dark:bg-gray-800">
+          <DialogHeader>
+            <DialogTitle className="dark:text-white">Delete Seller</DialogTitle>
+            <DialogDescription className="dark:text-gray-400">
+              Are you sure you want to delete this seller? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {sellerToDelete && (
+            <div className="py-4">
+              <div className="flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700">
+                <img
+                  src={sellerToDelete.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${sellerToDelete.id}`}
+                  alt={sellerToDelete.name}
+                  className="h-10 w-10 rounded-full"
+                />
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-white">{sellerToDelete.businessName}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{sellerToDelete.name} • {sellerToDelete.email}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDeleteDialogOpen(false);
+                setSellerToDelete(null);
+              }}
+              className="dark:border-gray-700 dark:text-gray-300"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteSeller}
+              className="bg-red-600 text-white hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete Seller
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* View Seller Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>

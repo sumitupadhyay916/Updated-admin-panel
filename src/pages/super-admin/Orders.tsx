@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ordersApi } from '@/services/api';
+import { useAuthStore } from '@/store/authStore';
 import type { Order } from '@/types';
 import type { ColumnDef } from '@tanstack/react-table';
 import { 
@@ -33,6 +34,7 @@ import {
 } from '@/components/ui/dialog';
 
 export default function OrdersManagement() {
+  const { user } = useAuthStore();
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
@@ -40,7 +42,12 @@ export default function OrdersManagement() {
   useEffect(() => {
     const loadOrders = async () => {
       try {
-        const response = await ordersApi.getOrders({ page: 1, limit: 100 });
+        // Sellers must only see orders that include their own items
+        const params: any = { page: 1, limit: 100 };
+        if (user?.role === 'seller' && user?.id) {
+          params.sellerId = user.id;
+        }
+        const response = await ordersApi.getOrders(params);
         if (response.success && Array.isArray(response.data)) {
           setOrders(response.data as Order[]);
         } else {
@@ -53,7 +60,7 @@ export default function OrdersManagement() {
     };
 
     void loadOrders();
-  }, []);
+  }, [user?.id, user?.role]);
 
   const handleUpdateStatus = async (orderId: string, status: Order['orderStatus']) => {
     try {
