@@ -64,6 +64,12 @@ const superAdminNavItems: NavItem[] = [
     roles: ['super_admin'],
   },
   {
+    label: 'My Products',
+    href: '/super-admin/my-products',
+    icon: Package,
+    roles: ['super_admin'],
+  },
+  {
     label: 'Orders',
     href: '/super-admin/orders',
     icon: ShoppingCart,
@@ -131,6 +137,12 @@ const adminNavItems: NavItem[] = [
   {
     label: 'Products',
     href: '/admin/products',
+    icon: Package,
+    roles: ['admin'],
+  },
+  {
+    label: 'My Products',
+    href: '/admin/my-products',
     icon: Package,
     roles: ['admin'],
   },
@@ -211,12 +223,12 @@ const sellerNavItems: NavItem[] = [
     icon: Wallet,
     roles: ['seller'],
   },
-  {
-    label: 'My Consumers',
-    href: '/seller/consumers',
-    icon: Users,
-    roles: ['seller'],
-  },
+  // {
+  //   label: 'My Consumers',
+  //   href: '/seller/consumers',
+  //   icon: Users,
+  //   roles: ['seller'],
+  // },
   {
     label: 'Support Pages',
     href: '/seller/support-pages',

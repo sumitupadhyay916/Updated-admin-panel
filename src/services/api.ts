@@ -330,6 +330,11 @@ export const sellersApi = {
     return response.data;
   },
 
+  getSellerConsumers: async (id: string, params?: PaginationParams): Promise<ApiResponse<unknown[]>> => {
+    const response = await apiClient.get(`/sellers/${id}/consumers`, { params });
+    return response.data;
+  },
+
   getSellerPayouts: async (id: string, params?: PaginationParams): Promise<ApiResponse<unknown[]>> => {
     const response = await apiClient.get(`/sellers/${id}/payouts`, { params });
     return response.data;

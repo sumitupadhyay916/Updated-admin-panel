@@ -101,6 +101,7 @@ function App() {
           <Route path="/super-admin/admins" element={<AdminManagement />} />
           <Route path="/super-admin/sellers" element={<SellerManagement />} />
           <Route path="/super-admin/products" element={<ProductsManagement />} />
+          <Route path="/super-admin/my-products" element={<ProductsManagement />} />
           <Route path="/super-admin/orders" element={<OrdersManagement />} />
           <Route path="/super-admin/categories" element={<Categories />} />
           <Route path="/super-admin/payouts" element={<PayoutsManagement />} />
@@ -119,6 +120,7 @@ function App() {
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/sellers" element={<SellerManagement />} />
           <Route path="/admin/products" element={<ProductsManagement />} />
+          <Route path="/admin/my-products" element={<ProductsManagement />} />
           <Route path="/admin/orders" element={<OrdersManagement />} />
           <Route path="/admin/categories" element={<Categories />} />
           <Route path="/admin/payouts" element={<PayoutsManagement />} />

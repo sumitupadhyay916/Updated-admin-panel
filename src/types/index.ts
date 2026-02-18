@@ -196,6 +196,24 @@ export interface Order {
   updatedAt: string;
 }
 
+// ============================================
+// SELLER CONSUMER TYPES
+// ============================================
+
+export interface SellerConsumer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  totalOrders: number;
+  totalSpent: number;
+  lastOrderId: string | null;
+  lastOrderNumber: string | null;
+  lastOrderDate: string | null;
+  lastPaymentStatus: PaymentStatus | null;
+  lastFulfillmentStatus: FulfillmentStatus | null;
+}
+
 export interface OrderTimeline {
   id: string;
   orderId: string;

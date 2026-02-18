@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { PageHeader } from '@/components/ui/page-header';
 import { DataTable } from '@/components/ui/data-table';
@@ -45,11 +46,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
 
-// Schema for super_admin and admin (sellerId required)
+// Schema for super_admin and admin (sellerId optional; defaults to "My Products")
 const productFormSchemaWithSeller = z.object({
   name: z.string().min(1, 'Product name is required').min(2, 'Product name must be at least 2 characters'),
   categoryId: z.string().min(1, 'Category is required'),
-  sellerId: z.string().min(1, 'Seller is required'),
+  sellerId: z.string().optional(),
   price: z.number().min(0.01, 'Price must be greater than 0'),
   stock: z.enum(['available', 'unavailable']),
 });
@@ -67,6 +68,7 @@ type ProductFormValues = z.infer<typeof productFormSchemaWithSeller>;
 
 export default function ProductsManagement() {
   const { user } = useAuthStore();
+  const location = useLocation();
   const isSeller = user?.role === 'seller';
   const isAdmin = user?.role === 'admin';
   const isSuperAdmin = user?.role === 'super_admin';
@@ -81,13 +83,16 @@ export default function ProductsManagement() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [sellerFilter, setSellerFilter] = useState<string>('__all__');
+
+  const isMyProductsPage = useMemo(() => location.pathname.endsWith('/my-products'), [location.pathname]);
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(isSeller ? productFormSchemaWithoutSeller : productFormSchemaWithSeller),
     defaultValues: {
       name: '',
       categoryId: '',
-      sellerId: '',
+      sellerId: isSeller ? '' : '__my__',
       price: 0,
       stock: 'available',
     },
@@ -98,7 +103,7 @@ export default function ProductsManagement() {
     defaultValues: {
       name: '',
       categoryId: '',
-      sellerId: '',
+      sellerId: isSeller ? '' : '__my__',
       price: 0,
       stock: 'available',
     },
@@ -107,7 +112,17 @@ export default function ProductsManagement() {
   const loadProducts = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await productsApi.getProducts({ page: 1, limit: 1000 });
+      const params: any = { page: 1, limit: 1000 };
+      if (!isSeller) {
+        const effectiveFilter = isMyProductsPage ? '__my__' : sellerFilter;
+        if (effectiveFilter === '__my__' && user?.id) {
+          params.sellerId = user.id;
+        } else if (effectiveFilter && effectiveFilter !== '__all__') {
+          params.sellerId = effectiveFilter;
+        }
+      }
+
+      const response = await productsApi.getProducts(params);
       if (response.success && Array.isArray(response.data)) {
         setProducts(response.data as Product[]);
       } else {
@@ -120,7 +135,7 @@ export default function ProductsManagement() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isSeller, isMyProductsPage, sellerFilter, user?.id]);
 
   const loadCategories = useCallback(async () => {
     try {
@@ -156,6 +171,13 @@ export default function ProductsManagement() {
     void loadSellers();
   }, [loadProducts, loadCategories, loadSellers]);
 
+  // If on My Products page, force filter to my products for admin/super_admin
+  useEffect(() => {
+    if (!isSeller && isMyProductsPage) {
+      setSellerFilter('__my__');
+    }
+  }, [isMyProductsPage, isSeller]);
+
   const handleCreateProduct = async (values: ProductFormValues) => {
     try {
       setIsLoading(true);
@@ -166,9 +188,15 @@ export default function ProductsManagement() {
         stock: values.stock,
       };
       
-      // Only include sellerId for super_admin and admin
-      if (!isSeller && values.sellerId) {
-        payload.sellerId = values.sellerId;
+      // Admin/SuperAdmin:
+      // - empty sellerId or "__my__" => create under current admin (My Products)
+      // - sellerId selected => create under that seller
+      if (!isSeller) {
+        if (!values.sellerId || values.sellerId === '__my__') {
+          payload.sellerId = user?.id;
+        } else {
+          payload.sellerId = values.sellerId;
+        }
       }
       
       const response = await productsApi.createProduct(payload);
@@ -178,7 +206,7 @@ export default function ProductsManagement() {
         form.reset({
           name: '',
           categoryId: '',
-          sellerId: '',
+          sellerId: isSeller ? '' : '__my__',
           price: 0,
           stock: 'available',
         });
@@ -206,12 +234,12 @@ export default function ProductsManagement() {
     editForm.reset({
       name: product.name,
       categoryId: product.categoryId.toString(),
-      sellerId: product.sellerId || '',
+      sellerId: !isSeller && user?.id && product.sellerId === user.id ? '__my__' : (product.sellerId || ''),
       price: product.price,
       stock: product.stock,
     });
     setIsEditDialogOpen(true);
-  }, [editForm]);
+  }, [editForm, isSeller, user?.id]);
 
   const handleUpdateProduct = async (values: ProductFormValues) => {
     if (!editingProduct) return;
@@ -225,9 +253,15 @@ export default function ProductsManagement() {
         stock: values.stock,
       };
       
-      // Only include sellerId for super_admin and admin
-      if (!isSeller && values.sellerId) {
-        payload.sellerId = values.sellerId;
+      // Admin/SuperAdmin:
+      // - empty sellerId or "__my__" => move to My Products (admin-owned)
+      // - sellerId selected => assign to that seller
+      if (!isSeller) {
+        if (!values.sellerId || values.sellerId === '__my__') {
+          payload.sellerId = user?.id;
+        } else {
+          payload.sellerId = values.sellerId;
+        }
       }
       
       const response = await productsApi.updateProduct(editingProduct.id, payload);
@@ -460,7 +494,7 @@ export default function ProductsManagement() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="All Categories Products"
+        title={isMyProductsPage && !isSeller ? 'My Products' : 'All Categories Products'}
         description="Manage all products across the marketplace"
         icon={Package}
       />
@@ -523,6 +557,32 @@ export default function ProductsManagement() {
                 className="w-full"
               />
             </div>
+            {/* {!isSeller && (
+              <div className="mr-4 w-64">
+                <Select
+                  value={isMyProductsPage ? '__my__' : sellerFilter}
+                  onValueChange={(v) => {
+                    setSellerFilter(v);
+                    void loadProducts();
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filter by seller" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All Products</SelectItem>
+                    <SelectItem value="__my__">My Products1</SelectItem>
+                    {sellers
+                      .filter((s) => s.status === 'active')
+                      .map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.businessName} ({s.email})
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )} */}
             <Button onClick={() => setIsAddDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Add Product
@@ -545,7 +605,7 @@ export default function ProductsManagement() {
             form.reset({
               name: '',
               categoryId: '',
-              sellerId: '',
+              sellerId: isSeller ? '' : '__my__',
               price: 0,
               stock: 'available',
             });
@@ -612,6 +672,7 @@ export default function ProductsManagement() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          <SelectItem value="__my__">My Products</SelectItem>
                           {sellers
                             .filter(seller => seller.status === 'active')
                             .map((seller) => (
@@ -705,7 +766,7 @@ export default function ProductsManagement() {
             editForm.reset({
               name: '',
               categoryId: '',
-              sellerId: '',
+              sellerId: isSeller ? '' : '__my__',
               price: 0,
               stock: 'available',
             });
@@ -772,6 +833,7 @@ export default function ProductsManagement() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          <SelectItem value="__my__">My Products</SelectItem>
                           {sellers
                             .filter(seller => seller.status === 'active')
                             .map((seller) => (
