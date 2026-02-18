@@ -223,12 +223,12 @@ const sellerNavItems: NavItem[] = [
     icon: Wallet,
     roles: ['seller'],
   },
-  {
-    label: 'My Consumers',
-    href: '/seller/consumers',
-    icon: Users,
-    roles: ['seller'],
-  },
+  // {
+  //   label: 'My Consumers',
+  //   href: '/seller/consumers',
+  //   icon: Users,
+  //   roles: ['seller'],
+  // },
   {
     label: 'Support Pages',
     href: '/seller/support-pages',
