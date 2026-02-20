@@ -93,35 +93,29 @@ const superAdminNavItems: NavItem[] = [
     icon: Wallet,
     roles: ['super_admin'],
   },
-  {
-    label: 'Coupons',
-    href: '/super-admin/coupons',
-    icon: Ticket,
-    roles: ['super_admin'],
-  },
+  // {
+  //   label: 'Coupons',
+  //   href: '/super-admin/coupons',
+  //   icon: Ticket,
+  //   roles: ['super_admin'],
+  // },
   {
     label: 'Contact Queries',
     href: '/super-admin/queries',
     icon: MessageSquare,
     roles: ['super_admin'],
   },
-  {
-    label: 'Support Pages',
-    href: '/super-admin/support-pages',
-    icon: BookOpen,
-    roles: ['super_admin'],
-    children: [
-      { label: 'Help Center', href: '/super-admin/support-pages/help-center', icon: HelpCircle, roles: ['super_admin'] },
-      { label: 'FAQs', href: '/super-admin/support-pages/faqs', icon: HelpCircle, roles: ['super_admin'] },
-      { label: 'Privacy Policy', href: '/super-admin/support-pages/privacy-policy', icon: Shield, roles: ['super_admin'] },
-      { label: 'Terms & Conditions', href: '/super-admin/support-pages/terms-conditions', icon: FileText, roles: ['super_admin'] },
-    ],
-  },
+  
   {
     label: 'Settings',
     href: '/super-admin/settings',
     icon: Settings,
     roles: ['super_admin'],
+    children: [
+      { label: 'FAQs', href: '/super-admin/support-pages/faqs', icon: HelpCircle, roles: ['super_admin'] },
+      { label: 'Privacy Policy', href: '/super-admin/support-pages/privacy-policy', icon: Shield, roles: ['super_admin'] },
+      { label: 'Terms & Conditions', href: '/super-admin/support-pages/terms-conditions', icon: FileText, roles: ['super_admin'] },
+    ],
   },
 ];
 
@@ -170,19 +164,19 @@ const adminNavItems: NavItem[] = [
     icon: Wallet,
     roles: ['admin'],
   },
+  // {
+  //   label: 'Coupons',
+  //   href: '/admin/coupons',
+  //   icon: Ticket,
+  //   roles: ['admin'],
+  // },
   {
-    label: 'Coupons',
-    href: '/admin/coupons',
-    icon: Ticket,
-    roles: ['admin'],
-  },
-  {
-    label: 'Support Pages',
-    href: '/admin/support-pages',
-    icon: BookOpen,
+    label: 'Settings',
+    href: '/admin/settings',
+    icon: Settings,
     roles: ['admin'],
     children: [
-      { label: 'Help Center', href: '/admin/support-pages/help-center', icon: HelpCircle, roles: ['admin'] },
+      
       { label: 'FAQs', href: '/admin/support-pages/faqs', icon: HelpCircle, roles: ['admin'] },
       { label: 'Privacy Policy', href: '/admin/support-pages/privacy-policy', icon: Shield, roles: ['admin'] },
       { label: 'Terms & Conditions', href: '/admin/support-pages/terms-conditions', icon: FileText, roles: ['admin'] },
@@ -218,6 +212,26 @@ const sellerNavItems: NavItem[] = [
     roles: ['seller'],
   },
   {
+    label: 'Coupons',
+    href: '/seller/coupons',
+    icon: Ticket,
+    roles: ['seller'],
+    children: [
+      { label: 'List Coupon', href: '/seller/coupons-list', icon: Ticket, roles: ['seller'] },
+      { label: 'Create Coupon ', href: '/seller/coupons-create', icon: ShoppingCart, roles: ['seller'] },
+    ],
+  },
+  {
+    label: 'Abandoned Carts',
+    href: '/seller/abandoned-carts',
+    icon: ShoppingCart,
+    roles: ['seller'],
+    children: [
+      { label: 'Abandoned Carts', href: '/seller/abandoned-carts', icon: ShoppingCart, roles: ['seller'] },
+      { label: 'Abandoned Carts', href: '/seller/abandoned-carts', icon: ShoppingCart, roles: ['seller'] },
+    ],
+  },
+  {
     label: 'My Payouts',
     href: '/seller/payouts',
     icon: Wallet,
@@ -230,23 +244,22 @@ const sellerNavItems: NavItem[] = [
   //   roles: ['seller'],
   // },
   {
-    label: 'Support Pages',
-    href: '/seller/support-pages',
-    icon: BookOpen,
+    label: 'Settings',
+    href: '/seller/settings',
+    icon: Settings,
     roles: ['seller'],
     children: [
-      { label: 'Help Center', href: '/seller/support-pages/help-center', icon: HelpCircle, roles: ['seller'] },
       { label: 'FAQs', href: '/seller/support-pages/faqs', icon: HelpCircle, roles: ['seller'] },
       { label: 'Privacy Policy', href: '/seller/support-pages/privacy-policy', icon: Shield, roles: ['seller'] },
       { label: 'Terms & Conditions', href: '/seller/support-pages/terms-conditions', icon: FileText, roles: ['seller'] },
     ],
   },
-  {
-    label: 'Profile',
-    href: '/seller/profile',
-    icon: Settings,
-    roles: ['seller'],
-  },
+  // {
+  //   label: 'Profile',
+  //   href: '/seller/profile',
+  //   icon: Settings,
+  //   roles: ['seller'],
+  // },
 ];
 
 interface SidebarProps {

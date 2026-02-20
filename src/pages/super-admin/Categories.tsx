@@ -1,7 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { PageHeader } from '@/components/ui/page-header';
 import { DataTable } from '@/components/ui/data-table';
-import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -51,8 +50,9 @@ import {
 const categoryFormSchema = z.object({
   name: z.string().min(1, 'Category name is required').min(2, 'Category name must be at least 2 characters'),
   status: z.enum(['active', 'inactive']),
-  noOfProducts: z.number().int().min(0, 'Number of products must be 0 or greater').default(0),
+  noOfProducts: z.number().int().min(0, 'Number of products must be 0 or greater'),
 });
+
 
 type CategoryFormValues = z.infer<typeof categoryFormSchema>;
 
@@ -142,7 +142,8 @@ export default function Categories() {
     if (!selectedCategory) return;
     try {
       setIsLoading(true);
-      const response = await categoriesApi.updateCategory(selectedCategory.id, values);
+      const response = await categoriesApi.updateCategory(selectedCategory.id.toString(), values);
+
       if (response.success && response.data) {
         toast.success('Category updated successfully');
         setIsEditDialogOpen(false);
@@ -168,7 +169,8 @@ export default function Categories() {
   const handleDelete = async () => {
     if (!selectedCategory) return;
     try {
-      const response = await categoriesApi.deleteCategory(selectedCategory.id);
+      const response = await categoriesApi.deleteCategory(selectedCategory.id.toString());
+
       if (response.success) {
         toast.success('Category deleted successfully');
         setIsDeleteDialogOpen(false);
@@ -349,7 +351,8 @@ export default function Categories() {
             <DialogDescription>Add a new product category to the system.</DialogDescription>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleCreate)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(handleCreate as any)} className="space-y-4">
+
               <FormField
                 control={form.control}
                 name="name"
@@ -429,7 +432,8 @@ export default function Categories() {
             <DialogDescription>Update category information.</DialogDescription>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleEdit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(handleEdit as any)} className="space-y-4">
+
               <FormField
                 control={form.control}
                 name="name"
