@@ -206,7 +206,6 @@ export default function SupportPagesManagement() {
 
       <Tabs defaultValue="pages" className="w-full">
         <TabsList className="dark:bg-gray-800">
-          <TabsTrigger value="pages" className="dark:data-[state=active]:bg-gray-700">Static Pages</TabsTrigger>
           <TabsTrigger value="faqs" className="dark:data-[state=active]:bg-gray-700">FAQs</TabsTrigger>
         </TabsList>
 

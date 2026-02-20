@@ -460,7 +460,17 @@ export const productsApi = {
     const response = await apiClient.get('/products/pending', { params });
     return response.data;
   },
+
+  uploadImage: async (file: File): Promise<ApiResponse<{ url: string }>> => {
+    const formData = new FormData();
+    formData.append('image', file);
+    const response = await apiClient.post('/products/upload-image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
 };
+
 
 // ============================================
 // ORDERS API

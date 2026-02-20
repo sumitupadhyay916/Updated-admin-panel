@@ -17,7 +17,10 @@ import {
   Plus,
   Edit2,
   Trash2,
+  ImageIcon,
+  X,
 } from 'lucide-react';
+
 import {
   Form,
   FormControl,
@@ -84,6 +87,12 @@ export default function ProductsManagement() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [sellerFilter, setSellerFilter] = useState<string>('__all__');
+  // Image upload state
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string>('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [editUploadedImageUrl, setEditUploadedImageUrl] = useState<string>('');
+  const [isEditUploading, setIsEditUploading] = useState(false);
+
 
   const isMyProductsPage = useMemo(() => location.pathname.endsWith('/my-products'), [location.pathname]);
 
@@ -187,6 +196,10 @@ export default function ProductsManagement() {
         price: values.price,
         stock: values.stock,
       };
+      if (uploadedImageUrl) {
+        payload.images = [uploadedImageUrl];
+      }
+
       
       // Admin/SuperAdmin:
       // - empty sellerId or "__my__" => create under current admin (My Products)
@@ -203,6 +216,7 @@ export default function ProductsManagement() {
       if (response.success && response.data) {
         toast.success('Product created successfully');
         setIsAddDialogOpen(false);
+        setUploadedImageUrl('');
         form.reset({
           name: '',
           categoryId: '',
@@ -210,6 +224,7 @@ export default function ProductsManagement() {
           price: 0,
           stock: 'available',
         });
+
         await loadProducts();
         await loadCategories(); // Refresh categories to update product count
       } else {
@@ -252,6 +267,10 @@ export default function ProductsManagement() {
         price: values.price,
         stock: values.stock,
       };
+      if (editUploadedImageUrl) {
+        payload.images = [editUploadedImageUrl];
+      }
+
       
       // Admin/SuperAdmin:
       // - empty sellerId or "__my__" => move to My Products (admin-owned)
@@ -269,7 +288,9 @@ export default function ProductsManagement() {
         toast.success('Product updated successfully');
         setIsEditDialogOpen(false);
         setEditingProduct(null);
+        setEditUploadedImageUrl('');
         editForm.reset({
+
           name: '',
           categoryId: '',
           sellerId: '',
@@ -602,6 +623,7 @@ export default function ProductsManagement() {
         onOpenChange={(open) => {
           setIsAddDialogOpen(open);
           if (!open) {
+            setUploadedImageUrl('');
             form.reset({
               name: '',
               categoryId: '',
@@ -612,6 +634,7 @@ export default function ProductsManagement() {
           }
         }}
       >
+
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create Product</DialogTitle>
@@ -729,12 +752,80 @@ export default function ProductsManagement() {
                   </FormItem>
                 )}
               />
+              {/* Image Uploader */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Product Image</label>
+                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                  {uploadedImageUrl ? (
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={uploadedImageUrl}
+                        alt="Product preview"
+                        className="h-20 w-20 rounded-lg object-cover border"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm text-green-600 font-medium">✓ Image uploaded</p>
+                        <p className="text-xs text-gray-500 truncate max-w-[200px]">{uploadedImageUrl}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setUploadedImageUrl('')}
+                        className="text-gray-400 hover:text-red-500 transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center gap-2 cursor-pointer">
+                      {isUploading ? (
+                        <>
+                          <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
+                          <span className="text-sm text-gray-500">Uploading to Cloudinary...</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
+                            <ImageIcon className="h-6 w-6 text-gray-400" />
+                          </div>
+                          <span className="text-sm text-gray-500">Click to upload product image</span>
+                          <span className="text-xs text-gray-400">JPG, PNG, WEBP up to 10MB</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={isUploading}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          setIsUploading(true);
+                          try {
+                            const result = await productsApi.uploadImage(file);
+                            if (result.success && result.data?.url) {
+                              setUploadedImageUrl(result.data.url);
+                              toast.success('Image uploaded successfully');
+                            } else {
+                              toast.error('Failed to upload image');
+                            }
+                          } catch {
+                            toast.error('Failed to upload image');
+                          } finally {
+                            setIsUploading(false);
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
               <DialogFooter>
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => {
                     setIsAddDialogOpen(false);
+                    setUploadedImageUrl('');
                     form.reset({
                       name: '',
                       categoryId: '',
@@ -756,13 +847,14 @@ export default function ProductsManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Product Dialog */}
+  {/* Edit Product Dialog */}
       <Dialog 
         open={isEditDialogOpen} 
         onOpenChange={(open) => {
           setIsEditDialogOpen(open);
           if (!open) {
             setEditingProduct(null);
+            setEditUploadedImageUrl('');
             editForm.reset({
               name: '',
               categoryId: '',
@@ -773,6 +865,7 @@ export default function ProductsManagement() {
           }
         }}
       >
+
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Product</DialogTitle>
@@ -890,7 +983,77 @@ export default function ProductsManagement() {
                   </FormItem>
                 )}
               />
+              {/* Image Uploader */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Product Image</label>
+                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                  {editUploadedImageUrl || editingProduct?.images?.[0] ? (
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={editUploadedImageUrl || editingProduct?.images?.[0] || ''}
+                        alt="Product preview"
+                        className="h-20 w-20 rounded-lg object-cover border"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm text-green-600 font-medium">✓ {editUploadedImageUrl ? 'New image uploaded' : 'Current image'}</p>
+                        <p className="text-xs text-gray-500 truncate max-w-[200px]">{editUploadedImageUrl || editingProduct?.images?.[0]}</p>
+                      </div>
+                      {editUploadedImageUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setEditUploadedImageUrl('')}
+                          className="text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center gap-2 cursor-pointer">
+                      {isEditUploading ? (
+                        <>
+                          <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
+                          <span className="text-sm text-gray-500">Uploading to Cloudinary...</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
+                            <ImageIcon className="h-6 w-6 text-gray-400" />
+                          </div>
+                          <span className="text-sm text-gray-500">Click to upload product image</span>
+                          <span className="text-xs text-gray-400">JPG, PNG, WEBP up to 10MB</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={isEditUploading}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          setIsEditUploading(true);
+                          try {
+                            const result = await productsApi.uploadImage(file);
+                            if (result.success && result.data?.url) {
+                              setEditUploadedImageUrl(result.data.url);
+                              toast.success('Image uploaded successfully');
+                            } else {
+                              toast.error('Failed to upload image');
+                            }
+                          } catch {
+                            toast.error('Failed to upload image');
+                          } finally {
+                            setIsEditUploading(false);
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
               <DialogFooter>
+
                 <Button
                   type="button"
                   variant="outline"
