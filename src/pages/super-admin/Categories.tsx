@@ -28,13 +28,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { categoriesApi } from '@/services/api';
+import { categoriesApi, productsApi } from '@/services/api';
 import type { Category } from '@/types';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Plus, Edit2, Trash2, Search, X, FolderOpen } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, X, FolderOpen, Upload, Loader2, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -50,6 +50,8 @@ import {
 const categoryFormSchema = z.object({
   name: z.string().min(1, 'Category name is required').min(2, 'Category name must be at least 2 characters'),
   status: z.enum(['active', 'inactive']),
+  imageUrl: z.string().optional(),
+  description: z.string().optional(),
   noOfProducts: z.number().int().min(0, 'Number of products must be 0 or greater'),
 });
 
@@ -66,14 +68,42 @@ export default function Categories() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Image Upload State
+  const [uploadedImageUrl, setUploadedImageUrl] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+
   const form = useForm<CategoryFormValues>({
     resolver: zodResolver(categoryFormSchema),
     defaultValues: {
       name: '',
       status: 'active',
+      imageUrl: '',
+      description: '',
       noOfProducts: 0,
     },
   });
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploading(true);
+      const response = await productsApi.uploadImage(file);
+      if (response.success && response.data) {
+        setUploadedImageUrl(response.data.url);
+        form.setValue('imageUrl', response.data.url); // Sync with form
+        toast.success('Image uploaded successfully');
+      } else {
+        toast.error('Failed to upload image');
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error('Error uploading image');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const loadCategories = useCallback(async () => {
     setIsLoading(true);
@@ -116,13 +146,22 @@ export default function Categories() {
   const handleCreate = async (values: CategoryFormValues) => {
     try {
       setIsLoading(true);
-      const response = await categoriesApi.createCategory(values);
+      const payload = {
+        ...values,
+        imageUrl: uploadedImageUrl || values.imageUrl,
+      };
+
+      const response = await categoriesApi.createCategory(payload);
       if (response.success && response.data) {
         toast.success('Category created successfully');
         setIsAddDialogOpen(false);
+        setUploadedImageUrl('');
         form.reset({
           name: '',
           status: 'active',
+          imageUrl: '',
+          description: '',
+          noOfProducts: 0,
         });
         // Reload categories to show the new one
         await loadCategories();
@@ -142,15 +181,24 @@ export default function Categories() {
     if (!selectedCategory) return;
     try {
       setIsLoading(true);
-      const response = await categoriesApi.updateCategory(selectedCategory.id.toString(), values);
+      const payload = {
+        ...values,
+        imageUrl: uploadedImageUrl || values.imageUrl,
+      };
+
+      const response = await categoriesApi.updateCategory(selectedCategory.id.toString(), payload);
 
       if (response.success && response.data) {
         toast.success('Category updated successfully');
         setIsEditDialogOpen(false);
         setSelectedCategory(null);
+        setUploadedImageUrl('');
         form.reset({
           name: '',
           status: 'active',
+          imageUrl: '',
+          description: '',
+          noOfProducts: 0,
         });
         // Reload categories to show the updated one
         await loadCategories();
@@ -186,9 +234,12 @@ export default function Categories() {
 
   const openEditDialog = (category: Category) => {
     setSelectedCategory(category);
+    setUploadedImageUrl(category.imageUrl || '');
     form.reset({
       name: category.name,
       status: category.status,
+      imageUrl: category.imageUrl || '',
+      description: category.description || '',
       noOfProducts: category.noOfProducts,
     });
     setIsEditDialogOpen(true);
@@ -212,6 +263,28 @@ export default function Categories() {
         cell: ({ row }) => {
           const cid = row.original.cid || row.original.id;
           return <div className="font-mono text-xs text-muted-foreground">{cid}</div>;
+        },
+      },
+      {
+        accessorKey: 'imageUrl',
+        header: 'Image',
+        cell: ({ row }) => {
+          const imageUrl = row.getValue('imageUrl') as string;
+          return (
+            <div className="w-10 h-10 rounded-md overflow-hidden border bg-muted">
+              {imageUrl ? (
+                <img
+                  src={imageUrl}
+                  alt={row.getValue('name')}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <ImageIcon className="w-4 h-4 text-muted-foreground opacity-50" />
+                </div>
+              )}
+            </div>
+          );
         },
       },
       {
@@ -280,7 +353,7 @@ export default function Categories() {
       <PageHeader
         title="Categories"
         description="Manage product categories"
-        // badge={categories.length.toString()}
+      // badge={categories.length.toString()}
       />
 
       {/* Total Categories Stat Card */}
@@ -332,14 +405,17 @@ export default function Categories() {
       </Card>
 
       {/* Create Dialog */}
-      <Dialog 
-        open={isAddDialogOpen} 
+      <Dialog
+        open={isAddDialogOpen}
         onOpenChange={(open) => {
           setIsAddDialogOpen(open);
           if (!open) {
+            setUploadedImageUrl('');
             form.reset({
               name: '',
               status: 'active',
+              imageUrl: '',
+              description: '',
               noOfProducts: 0,
             });
           }
@@ -361,6 +437,82 @@ export default function Categories() {
                     <FormLabel>Name</FormLabel>
                     <FormControl>
                       <Input placeholder="Category name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormItem>
+                <FormLabel>Category Image</FormLabel>
+                <div className="flex items-start gap-4 p-4 border rounded-lg">
+                  {uploadedImageUrl ? (
+                    <div className="relative w-24 h-24 rounded-lg overflow-hidden border shrink-0">
+                      <img
+                        src={uploadedImageUrl}
+                        alt="Category preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUploadedImageUrl('');
+                          form.setValue('imageUrl', '');
+                        }}
+                        className="absolute top-1 right-1 p-1 bg-destructive/90 text-white rounded-full hover:bg-destructive shadow-sm transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-24 h-24 rounded-lg border-2 border-dashed flex items-center justify-center text-muted-foreground bg-muted/50 shrink-0">
+                      <ImageIcon className="w-8 h-8 opacity-50" />
+                    </div>
+                  )}
+
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        disabled={isUploading}
+                        className="hidden"
+                        id="create-category-image"
+                      />
+                      <label
+                        htmlFor="create-category-image"
+                        className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium transition-colors border rounded-md shadow-sm cursor-pointer hover:bg-accent hover:text-accent-foreground ${isUploading ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
+                          }`}
+                      >
+                        {isUploading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4" />
+                            Upload Image
+                          </>
+                        )}
+                      </label>
+                    </div>
+                    <p className="text-[0.8rem] text-muted-foreground">
+                      Recommended size: 500x500px. Max size: 5MB.
+                    </p>
+                  </div>
+                </div>
+              </FormItem>
+
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Category description (optional)" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -412,15 +564,18 @@ export default function Categories() {
       </Dialog>
 
       {/* Edit Dialog */}
-      <Dialog 
-        open={isEditDialogOpen} 
+      <Dialog
+        open={isEditDialogOpen}
         onOpenChange={(open) => {
           setIsEditDialogOpen(open);
           if (!open) {
             setSelectedCategory(null);
+            setUploadedImageUrl('');
             form.reset({
               name: '',
               status: 'active',
+              imageUrl: '',
+              description: '',
               noOfProducts: 0,
             });
           }
@@ -442,6 +597,79 @@ export default function Categories() {
                     <FormLabel>Name</FormLabel>
                     <FormControl>
                       <Input placeholder="Category name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormItem>
+                <FormLabel>Category Image</FormLabel>
+                <div className="flex items-start gap-4 p-4 border rounded-lg">
+                  {uploadedImageUrl ? (
+                    <div className="relative w-24 h-24 rounded-lg overflow-hidden border shrink-0">
+                      <img
+                        src={uploadedImageUrl}
+                        alt="Category preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUploadedImageUrl('');
+                          form.setValue('imageUrl', '');
+                        }}
+                        className="absolute top-1 right-1 p-1 bg-destructive/90 text-white rounded-full hover:bg-destructive shadow-sm transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-24 h-24 rounded-lg border-2 border-dashed flex items-center justify-center text-muted-foreground bg-muted/50 shrink-0">
+                      <ImageIcon className="w-8 h-8 opacity-50" />
+                    </div>
+                  )}
+
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        disabled={isUploading}
+                        className="hidden"
+                        id="edit-category-image"
+                      />
+                      <label
+                        htmlFor="edit-category-image"
+                        className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium transition-colors border rounded-md shadow-sm cursor-pointer hover:bg-accent hover:text-accent-foreground ${isUploading ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
+                          }`}
+                      >
+                        {isUploading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4" />
+                            Change Image
+                          </>
+                        )}
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </FormItem>
+
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Category description (optional)" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -475,9 +703,9 @@ export default function Categories() {
                   <FormItem>
                     <FormLabel>No. of Products</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        placeholder="0" 
+                      <Input
+                        type="number"
+                        placeholder="0"
                         min="0"
                         {...field}
                         onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)}

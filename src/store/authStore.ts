@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type { User, UserRole, LoginCredentials, SuperAdmin, Admin } from '@/types';
 import { authApi } from '@/services/api';
 
@@ -44,23 +44,23 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (credentials: LoginCredentials): Promise<boolean> => {
         set({ isLoading: true });
-        
+
         try {
           const response = await authApi.login({
             email: credentials.email,
             password: credentials.password,
             role: credentials.role,
           });
-          
+
           if (response.success && response.data) {
             const { user, token } = response.data as { user: User; token: string };
-            
+
             // Check if role matches (if specified)
             if (credentials.role && user.role !== credentials.role) {
               set({ isLoading: false });
               return false;
             }
-            
+
             set({
               user,
               token,
@@ -69,7 +69,7 @@ export const useAuthStore = create<AuthState>()(
             });
             return true;
           }
-          
+
           set({ isLoading: false });
           return false;
         } catch (error) {
@@ -102,11 +102,11 @@ export const useAuthStore = create<AuthState>()(
       hasPermission: (permission: string): boolean => {
         const { user } = get();
         if (!user) return false;
-        
+
         if (user.role === 'super_admin') return true;
         if ('permissions' in user && Array.isArray((user as SuperAdmin | Admin).permissions)) {
-          return (user as SuperAdmin | Admin).permissions.includes(permission) || 
-                 (user as SuperAdmin | Admin).permissions.includes('all');
+          return (user as SuperAdmin | Admin).permissions.includes(permission) ||
+            (user as SuperAdmin | Admin).permissions.includes('all');
         }
         return false;
       },
@@ -114,15 +114,16 @@ export const useAuthStore = create<AuthState>()(
       canAccessRoute: (route: string): boolean => {
         const { user } = get();
         if (!user) return false;
-        
+
         const allowedRoutes = routeAccessRules[user.role] || [];
         return allowedRoutes.some(allowedRoute => route.startsWith(allowedRoute));
       },
     }),
     {
       name: 'auth-storage',
-      partialize: (state) => ({ 
-        user: state.user, 
+      storage: createJSONStorage(() => sessionStorage),
+      partialize: (state) => ({
+        user: state.user,
         isAuthenticated: state.isAuthenticated,
         token: state.token,
       }),
