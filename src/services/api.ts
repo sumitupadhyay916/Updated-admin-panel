@@ -591,18 +591,24 @@ export const payoutsApi = {
 // ============================================
 
 export interface CreateCouponRequest {
+  title: string;
   code: string;
   description: string;
   discountType: string;
   discountValue: number;
   minOrderAmount?: number;
   maxDiscountAmount?: number;
+  maxSpend?: number;
+  isFreeShipping?: boolean;
   usageLimit?: number;
+  limitPerUser?: number;
   startDate: string;
   endDate: string;
   applicableTo?: string;
   sellerIds?: string[];
   productIds?: string[];
+  categoryIds?: number[];
+  isActive?: boolean;
 }
 
 export const couponsApi = {
@@ -826,4 +832,177 @@ export const supportApi = {
   },
 };
 
+export interface AbandonedCartItem {
+  id: string;
+  productId?: number | null;
+  productName: string;
+  productImage?: string | null;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export interface AbandonedCart {
+  id: string;
+  cartNumber: string;
+  customerId?: string | null;
+  customerName: string;
+  customerEmail: string;
+  customerPhone?: string | null;
+  sellerId: string;
+  cartValue: number;
+  itemCount: number;
+  status: 'abandoned' | 'recovered' | 'expired';
+  emailStatus: 'not_sent' | 'sent' | 'opened';
+  recoveredAt?: string | null;
+  reminderSentAt?: string | null;
+  couponCode?: string | null;
+  notes?: string | null;
+  items: AbandonedCartItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AbandonedCartStats {
+  totalCarts: number;
+  recoveredCarts: number;
+  totalPotentialRevenue: number;
+  recoveryRate: number;
+}
+
+export interface AbandonedCartsListResponse {
+  success: boolean;
+  message: string;
+  data: AbandonedCart[];
+  stats: AbandonedCartStats;
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
+
+export const abandonedCartsApi = {
+  list: async (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<AbandonedCartsListResponse> => {
+    const response = await apiClient.get('/abandoned-carts', { params });
+    return response.data;
+  },
+
+  get: async (id: string): Promise<ApiResponse<AbandonedCart>> => {
+    const response = await apiClient.get(`/abandoned-carts/${id}`);
+    return response.data;
+  },
+
+  create: async (data: {
+    customerName: string;
+    customerEmail: string;
+    customerPhone?: string;
+    customerId?: string;
+    items: Omit<AbandonedCartItem, 'id'>[];
+    notes?: string;
+  }): Promise<ApiResponse<AbandonedCart>> => {
+    const response = await apiClient.post('/abandoned-carts', data);
+    return response.data;
+  },
+
+  update: async (
+    id: string,
+    data: {
+      status?: 'abandoned' | 'recovered' | 'expired';
+      emailStatus?: 'not_sent' | 'sent' | 'opened';
+      couponCode?: string;
+      notes?: string;
+    }
+  ): Promise<ApiResponse<AbandonedCart>> => {
+    const response = await apiClient.put(`/abandoned-carts/${id}`, data);
+    return response.data;
+  },
+
+  delete: async (id: string): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete(`/abandoned-carts/${id}`);
+    return response.data;
+  },
+
+  sendReminder: async (id: string): Promise<ApiResponse<AbandonedCart>> => {
+    const response = await apiClient.post(`/abandoned-carts/${id}/send-reminder`);
+    return response.data;
+  },
+
+  markExpired: async (id: string): Promise<ApiResponse<AbandonedCart>> => {
+    const response = await apiClient.post(`/abandoned-carts/${id}/mark-expired`);
+    return response.data;
+  },
+};
+
+// ============================================
+// SELLER POLICIES API
+// ============================================
+
+export interface SellerPolicyData {
+  privacyPolicy?: string;
+  termsConditions?: string;
+}
+
+export interface SellerFAQData {
+  question: string;
+  answer: string;
+  category?: string;
+  order?: number;
+}
+
+export const sellerPoliciesApi = {
+  // ── Seller (authenticated) ────────────────────────────────────────────────
+  getMyPolicies: async (): Promise<ApiResponse<SellerPolicyData>> => {
+    const response = await apiClient.get('/seller-policies/my');
+    return response.data;
+  },
+
+  updateMyPolicies: async (data: SellerPolicyData): Promise<ApiResponse<SellerPolicyData>> => {
+    const response = await apiClient.put('/seller-policies/my', data);
+    return response.data;
+  },
+
+  getMyFAQs: async (): Promise<ApiResponse<unknown[]>> => {
+    const response = await apiClient.get('/seller-policies/my/faqs');
+    return response.data;
+  },
+
+  createFAQ: async (data: SellerFAQData): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.post('/seller-policies/my/faqs', data);
+    return response.data;
+  },
+
+  updateFAQ: async (id: string, data: Partial<SellerFAQData>): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.put(`/seller-policies/my/faqs/${id}`, data);
+    return response.data;
+  },
+
+  deleteFAQ: async (id: string): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete(`/seller-policies/my/faqs/${id}`);
+    return response.data;
+  },
+
+  // ── Public (no auth) ─────────────────────────────────────────────────────
+  getPublicPolicies: async (sellerId: string): Promise<ApiResponse<SellerPolicyData>> => {
+    const response = await apiClient.get(`/seller-policies/public/${sellerId}`);
+    return response.data;
+  },
+
+  getPublicFAQs: async (sellerId: string): Promise<ApiResponse<unknown[]>> => {
+    const response = await apiClient.get(`/seller-policies/public/${sellerId}/faqs`);
+    return response.data;
+  },
+};
+
 export default apiClient;
+

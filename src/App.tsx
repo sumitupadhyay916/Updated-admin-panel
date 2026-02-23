@@ -21,6 +21,10 @@ import AdminDashboard from '@/pages/admin/Dashboard';
 
 // Seller Pages
 import SellerDashboard from '@/pages/seller/Dashboard';
+import ListCoupon from '@/pages/seller/Coupons/ListCoupon';
+import CreateCoupon from '@/pages/seller/Coupons/CreateCoupon';
+import AbandonedCarts from '@/pages/seller/AbandonedCarts';
+import SellerSupportPages from '@/pages/seller/SellerSupportPages';
 
 // Protected Route Component
 function ProtectedRoute({ 
@@ -140,8 +144,16 @@ function App() {
           <Route path="/seller/products" element={<ProductsManagement />} />
           <Route path="/seller/orders" element={<OrdersManagement />} />
           <Route path="/seller/payouts" element={<PayoutsManagement />} />
-          <Route path="/seller/support-pages" element={<SupportPages />} />
-          <Route path="/seller/support-pages/:slug" element={<SupportPages />} />
+          <Route path="/seller/coupons" element={<ListCoupon />} />
+          <Route path="/seller/coupons/create" element={<CreateCoupon />} />
+          <Route path="/seller/abandoned-carts" element={<AbandonedCarts />} />
+          <Route path="/seller/support-pages" element={<SellerSupportPages />} />
+          <Route path="/seller/support-pages/:slug" element={<SellerSupportPages />} />
+          {/* Settings routes — sidebar Settings parent highlights for /seller/settings/* */}
+          <Route path="/seller/settings" element={<SellerSupportPages />} />
+          <Route path="/seller/settings/faqs" element={<SellerSupportPages />} />
+          <Route path="/seller/settings/privacy-policy" element={<SellerSupportPages />} />
+          <Route path="/seller/settings/terms-conditions" element={<SellerSupportPages />} />
         </Route>
 
         {/* Default Redirect */}

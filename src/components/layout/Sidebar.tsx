@@ -105,18 +105,6 @@ const superAdminNavItems: NavItem[] = [
     icon: MessageSquare,
     roles: ['super_admin'],
   },
-  
-  {
-    label: 'Settings',
-    href: '/super-admin/settings',
-    icon: Settings,
-    roles: ['super_admin'],
-    children: [
-      { label: 'FAQs', href: '/super-admin/support-pages/faqs', icon: HelpCircle, roles: ['super_admin'] },
-      { label: 'Privacy Policy', href: '/super-admin/support-pages/privacy-policy', icon: Shield, roles: ['super_admin'] },
-      { label: 'Terms & Conditions', href: '/super-admin/support-pages/terms-conditions', icon: FileText, roles: ['super_admin'] },
-    ],
-  },
 ];
 
 // Admin Navigation
@@ -164,12 +152,12 @@ const adminNavItems: NavItem[] = [
     icon: Wallet,
     roles: ['admin'],
   },
-  // {
-  //   label: 'Coupons',
-  //   href: '/admin/coupons',
-  //   icon: Ticket,
-  //   roles: ['admin'],
-  // },
+  {
+    label: 'Coupons',
+    href: '/admin/coupons',
+    icon: Ticket,
+    roles: ['admin'],
+  },
   {
     label: 'Settings',
     href: '/admin/settings',
@@ -193,12 +181,12 @@ const sellerNavItems: NavItem[] = [
     icon: Package,
     roles: ['seller'],
   },
-  {
-    label: 'My Inventory',
-    href: '/seller/inventory',
-    icon: Warehouse,
-    roles: ['seller'],
-  },
+  // {
+  //   label: 'My Inventory',
+  //   href: '/seller/inventory',
+  //   icon: Warehouse,
+  //   roles: ['seller'],
+  // },
   {
     label: 'My Orders',
     href: '/seller/orders',
@@ -206,37 +194,35 @@ const sellerNavItems: NavItem[] = [
     roles: ['seller'],
   },
   {
-    label: 'My Sales',
-    href: '/seller/sales',
-    icon: BarChart3,
+    label: 'My Payouts',
+    href: '/seller/payouts',
+    icon: Wallet,
     roles: ['seller'],
-  },
-  {
-    label: 'Coupons',
-    href: '/seller/coupons',
-    icon: Ticket,
-    roles: ['seller'],
-    children: [
-      { label: 'List Coupon', href: '/seller/coupons-list', icon: Ticket, roles: ['seller'] },
-      { label: 'Create Coupon ', href: '/seller/coupons-create', icon: ShoppingCart, roles: ['seller'] },
-    ],
   },
   {
     label: 'Abandoned Carts',
     href: '/seller/abandoned-carts',
     icon: ShoppingCart,
     roles: ['seller'],
+  },
+  // {
+  //   label: 'My Sales',
+  //   href: '/seller/sales',
+  //   icon: BarChart3,
+  //   roles: ['seller'],
+  // },
+  {
+    label: 'Coupons',
+    href: '/seller/coupons',
+    icon: Ticket,
+    roles: ['seller'],
     children: [
-      { label: 'Abandoned Carts', href: '/seller/abandoned-carts', icon: ShoppingCart, roles: ['seller'] },
-      { label: 'Abandoned Carts', href: '/seller/abandoned-carts', icon: ShoppingCart, roles: ['seller'] },
+      { label: 'List Coupon', href: '/seller/coupons', icon: Ticket, roles: ['seller'] },
+      { label: 'Create Coupon ', href: '/seller/coupons/create', icon: ShoppingCart, roles: ['seller'] },
     ],
   },
-  {
-    label: 'My Payouts',
-    href: '/seller/payouts',
-    icon: Wallet,
-    roles: ['seller'],
-  },
+  
+  
   // {
   //   label: 'My Consumers',
   //   href: '/seller/consumers',
@@ -249,9 +235,9 @@ const sellerNavItems: NavItem[] = [
     icon: Settings,
     roles: ['seller'],
     children: [
-      { label: 'FAQs', href: '/seller/support-pages/faqs', icon: HelpCircle, roles: ['seller'] },
-      { label: 'Privacy Policy', href: '/seller/support-pages/privacy-policy', icon: Shield, roles: ['seller'] },
-      { label: 'Terms & Conditions', href: '/seller/support-pages/terms-conditions', icon: FileText, roles: ['seller'] },
+      { label: 'FAQs', href: '/seller/settings/faqs', icon: HelpCircle, roles: ['seller'] },
+      { label: 'Privacy Policy', href: '/seller/settings/privacy-policy', icon: Shield, roles: ['seller'] },
+      { label: 'Terms & Conditions', href: '/seller/settings/terms-conditions', icon: FileText, roles: ['seller'] },
     ],
   },
   // {
