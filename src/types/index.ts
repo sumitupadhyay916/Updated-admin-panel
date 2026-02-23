@@ -85,6 +85,9 @@ export interface Category {
   id: number;
   cid: string;
   name: string;
+  slug: string;
+  imageUrl?: string;
+  description?: string;
   status: 'active' | 'inactive';
   noOfProducts: number;
   productCount: number;

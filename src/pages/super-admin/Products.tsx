@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { productsApi, categoriesApi, sellersApi } from '@/services/api';
 import type { Product, Category, Seller } from '@/types';
 import type { ColumnDef } from '@tanstack/react-table';
-import { 
+import {
   Package,
   Eye,
   Plus,
@@ -184,6 +184,8 @@ export default function ProductsManagement() {
   useEffect(() => {
     if (!isSeller && isMyProductsPage) {
       setSellerFilter('__my__');
+    } else if (!isSeller && !isMyProductsPage) {
+      setSellerFilter('__all__');
     }
   }, [isMyProductsPage, isSeller]);
 
@@ -200,7 +202,7 @@ export default function ProductsManagement() {
         payload.images = [uploadedImageUrl];
       }
 
-      
+
       // Admin/SuperAdmin:
       // - empty sellerId or "__my__" => create under current admin (My Products)
       // - sellerId selected => create under that seller
@@ -211,7 +213,7 @@ export default function ProductsManagement() {
           payload.sellerId = values.sellerId;
         }
       }
-      
+
       const response = await productsApi.createProduct(payload);
       if (response.success && response.data) {
         toast.success('Product created successfully');
@@ -271,7 +273,7 @@ export default function ProductsManagement() {
         payload.images = [editUploadedImageUrl];
       }
 
-      
+
       // Admin/SuperAdmin:
       // - empty sellerId or "__my__" => move to My Products (admin-owned)
       // - sellerId selected => assign to that seller
@@ -282,7 +284,7 @@ export default function ProductsManagement() {
           payload.sellerId = values.sellerId;
         }
       }
-      
+
       const response = await productsApi.updateProduct(editingProduct.id, payload);
       if (response.success && response.data) {
         toast.success('Product updated successfully');
@@ -350,160 +352,160 @@ export default function ProductsManagement() {
 
   const columns: ColumnDef<Product>[] = useMemo(() => {
     const isSeller = user?.role === 'seller';
-    
+
     const allColumns: ColumnDef<Product>[] = [
-    {
-      id: 'select',
-      header: ({ table }: { table: { getIsAllPageRowsSelected: () => boolean; toggleAllPageRowsSelected: (value: boolean) => void } }) => (
-        <Checkbox
-          checked={table.getIsAllPageRowsSelected()}
-          onCheckedChange={(value: boolean) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
-        />
-      ),
-      cell: ({ row }: { row: { getIsSelected: () => boolean; toggleSelected: (value: boolean) => void } }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value: boolean) => row.toggleSelected(!!value)}
-          aria-label="Select row"
-        />
-      ),
-      enableSorting: false,
-      enableHiding: false,
-    },
-    {
-      accessorKey: 'id',
-      header: 'ID',
-      cell: ({ row }: { row: { original: Product } }) => (
-        <div className="font-medium">{row.original.id}</div>
-      ),
-    },
-    {
-      accessorKey: 'pid',
-      header: 'PID',
-      cell: ({ row }: { row: { original: Product } }) => (
-        <div className="font-mono text-xs text-muted-foreground">{row.original.pid}</div>
-      ),
-    },
-    {
-      accessorKey: 'name',
-      header: 'Products',
-      cell: ({ row }: { row: { original: Product } }) => {
-        const product = row.original;
-        return (
-          <div className="flex items-center gap-3">
-            {product.images && product.images.length > 0 && (
-              <img
-                src={product.images[0]}
-                alt={product.name}
-                className="h-12 w-12 rounded-lg object-cover"
-              />
-            )}
-            <div>
-              <p className="font-medium text-gray-900 dark:text-white">{product.name}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">{product.sellerName}</p>
+      {
+        id: 'select',
+        header: ({ table }: { table: { getIsAllPageRowsSelected: () => boolean; toggleAllPageRowsSelected: (value: boolean) => void } }) => (
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected()}
+            onCheckedChange={(value: boolean) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Select all"
+          />
+        ),
+        cell: ({ row }: { row: { getIsSelected: () => boolean; toggleSelected: (value: boolean) => void } }) => (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value: boolean) => row.toggleSelected(!!value)}
+            aria-label="Select row"
+          />
+        ),
+        enableSorting: false,
+        enableHiding: false,
+      },
+      {
+        accessorKey: 'id',
+        header: 'ID',
+        cell: ({ row }: { row: { original: Product } }) => (
+          <div className="font-medium">{row.original.id}</div>
+        ),
+      },
+      {
+        accessorKey: 'pid',
+        header: 'PID',
+        cell: ({ row }: { row: { original: Product } }) => (
+          <div className="font-mono text-xs text-muted-foreground">{row.original.pid}</div>
+        ),
+      },
+      {
+        accessorKey: 'name',
+        header: 'Products',
+        cell: ({ row }: { row: { original: Product } }) => {
+          const product = row.original;
+          return (
+            <div className="flex items-center gap-3">
+              {product.images && product.images.length > 0 && (
+                <img
+                  src={product.images[0]}
+                  alt={product.name}
+                  className="h-12 w-12 rounded-lg object-cover"
+                />
+              )}
+              <div>
+                <p className="font-medium text-gray-900 dark:text-white">{product.name}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{product.sellerName}</p>
+              </div>
             </div>
-          </div>
-        );
+          );
+        },
       },
-    },
-    {
-      accessorKey: 'categoryName',
-      header: 'Categories',
-      cell: ({ row }: { row: { original: Product } }) => {
-        const product = row.original;
-        return (
+      {
+        accessorKey: 'categoryName',
+        header: 'Categories',
+        cell: ({ row }: { row: { original: Product } }) => {
+          const product = row.original;
+          return (
+            <div>
+              <p className="font-medium text-gray-900 dark:text-white">{product.categoryName || 'Uncategorized'}</p>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'price',
+        header: 'Price',
+        cell: ({ row }: { row: { original: Product } }) => (
           <div>
-            <p className="font-medium text-gray-900 dark:text-white">{product.categoryName || 'Uncategorized'}</p>
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: 'price',
-      header: 'Price',
-      cell: ({ row }: { row: { original: Product } }) => (
-        <div>
-          <p className="font-medium text-gray-900 dark:text-white">
-            {formatCurrency(row.original.price)}
-          </p>
-          {row.original.comparePrice && (
-            <p className="text-xs text-gray-500 line-through">
-              {formatCurrency(row.original.comparePrice)}
+            <p className="font-medium text-gray-900 dark:text-white">
+              {formatCurrency(row.original.price)}
             </p>
-          )}
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'stock',
-      header: 'Stock',
-      cell: ({ row }: { row: { original: Product } }) => {
-        const stock = row.original.stock;
-        return (
-          <Badge variant={stock === 'available' ? 'default' : 'secondary'}>
-            {stock === 'available' ? 'Available' : 'Unavailable'}
-          </Badge>
-        );
-      },
-    },
-    {
-      accessorKey: 'createdAt',
-      header: 'Created',
-      cell: ({ row }: { row: { original: Product } }) => {
-        const date = new Date(row.original.createdAt);
-        return (
-          <div className="text-sm">
-            {date.toLocaleDateString('en-GB')} {date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+            {row.original.comparePrice && (
+              <p className="text-xs text-gray-500 line-through">
+                {formatCurrency(row.original.comparePrice)}
+              </p>
+            )}
           </div>
-        );
+        ),
       },
-    },
-    {
-      id: 'actions',
-      header: '',
-      cell: ({ row }) => {
-        const product = row.original;
-        return (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => openViewDialog(product)}
-              className="h-8 w-8 p-0"
-              title="View Details"
-            >
-              <Eye className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => openEditDialog(product)}
-              className="h-8 w-8 p-0"
-              title="Edit Product"
-            >
-              <Edit2 className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => openDeleteDialog(product)}
-              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-              title="Delete Product"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        );
+      {
+        accessorKey: 'stock',
+        header: 'Stock',
+        cell: ({ row }: { row: { original: Product } }) => {
+          const stock = row.original.stock;
+          return (
+            <Badge variant={stock === 'available' ? 'default' : 'secondary'}>
+              {stock === 'available' ? 'Available' : 'Unavailable'}
+            </Badge>
+          );
+        },
       },
-    },
-  ];
+      {
+        accessorKey: 'createdAt',
+        header: 'Created',
+        cell: ({ row }: { row: { original: Product } }) => {
+          const date = new Date(row.original.createdAt);
+          return (
+            <div className="text-sm">
+              {date.toLocaleDateString('en-GB')} {date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          );
+        },
+      },
+      {
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => {
+          const product = row.original;
+          return (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => openViewDialog(product)}
+                className="h-8 w-8 p-0"
+                title="View Details"
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => openEditDialog(product)}
+                className="h-8 w-8 p-0"
+                title="Edit Product"
+              >
+                <Edit2 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => openDeleteDialog(product)}
+                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                title="Delete Product"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          );
+        },
+      },
+    ];
 
     // Filter out Categories column for sellers
     if (isSeller) {
       return allColumns.filter(col => col.accessorKey !== 'categoryName');
     }
-    
+
     return allColumns;
   }, [user, openEditDialog, openDeleteDialog]);
 
@@ -618,8 +620,8 @@ export default function ProductsManagement() {
       </Card>
 
       {/* Create Product Dialog */}
-      <Dialog 
-        open={isAddDialogOpen} 
+      <Dialog
+        open={isAddDialogOpen}
         onOpenChange={(open) => {
           setIsAddDialogOpen(open);
           if (!open) {
@@ -717,9 +719,9 @@ export default function ProductsManagement() {
                   <FormItem>
                     <FormLabel>Price</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        placeholder="0.00" 
+                      <Input
+                        type="number"
+                        placeholder="0.00"
                         step="0.01"
                         min="0"
                         {...field}
@@ -847,9 +849,9 @@ export default function ProductsManagement() {
         </DialogContent>
       </Dialog>
 
-  {/* Edit Product Dialog */}
-      <Dialog 
-        open={isEditDialogOpen} 
+      {/* Edit Product Dialog */}
+      <Dialog
+        open={isEditDialogOpen}
         onOpenChange={(open) => {
           setIsEditDialogOpen(open);
           if (!open) {
@@ -948,9 +950,9 @@ export default function ProductsManagement() {
                   <FormItem>
                     <FormLabel>Price</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        placeholder="0.00" 
+                      <Input
+                        type="number"
+                        placeholder="0.00"
                         step="0.01"
                         min="0"
                         {...field}

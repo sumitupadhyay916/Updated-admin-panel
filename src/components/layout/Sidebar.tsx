@@ -81,12 +81,12 @@ const superAdminNavItems: NavItem[] = [
     icon: Warehouse,
     roles: ['super_admin'],
   },
-  {
-    label: 'Sales Reports',
-    href: '/super-admin/reports',
-    icon: BarChart3,
-    roles: ['super_admin'],
-  },
+  // {
+  //   label: 'Sales Reports',
+  //   href: '/super-admin/reports',
+  //   icon: BarChart3,
+  //   roles: ['super_admin'],
+  // },
   {
     label: 'Payout Management',
     href: '/super-admin/payouts',
@@ -105,7 +105,7 @@ const superAdminNavItems: NavItem[] = [
     icon: MessageSquare,
     roles: ['super_admin'],
   },
-  
+
   {
     label: 'Settings',
     href: '/super-admin/settings',
@@ -152,12 +152,12 @@ const adminNavItems: NavItem[] = [
     icon: Warehouse,
     roles: ['admin'],
   },
-  {
-    label: 'Sales Reports',
-    href: '/admin/reports',
-    icon: BarChart3,
-    roles: ['admin'],
-  },
+  // {
+  //   label: 'Sales Reports',
+  //   href: '/admin/reports',
+  //   icon: BarChart3,
+  //   roles: ['admin'],
+  // },
   {
     label: 'Payouts',
     href: '/admin/payouts',
@@ -176,7 +176,7 @@ const adminNavItems: NavItem[] = [
     icon: Settings,
     roles: ['admin'],
     children: [
-      
+
       { label: 'FAQs', href: '/admin/support-pages/faqs', icon: HelpCircle, roles: ['admin'] },
       { label: 'Privacy Policy', href: '/admin/support-pages/privacy-policy', icon: Shield, roles: ['admin'] },
       { label: 'Terms & Conditions', href: '/admin/support-pages/terms-conditions', icon: FileText, roles: ['admin'] },
@@ -205,12 +205,12 @@ const sellerNavItems: NavItem[] = [
     icon: ShoppingCart,
     roles: ['seller'],
   },
-  {
-    label: 'My Sales',
-    href: '/seller/sales',
-    icon: BarChart3,
-    roles: ['seller'],
-  },
+  // {
+  //   label: 'My Sales',
+  //   href: '/seller/sales',
+  //   icon: BarChart3,
+  //   roles: ['seller'],
+  // },
   {
     label: 'Coupons',
     href: '/seller/coupons',
@@ -331,10 +331,10 @@ function SidebarContent() {
   const navItems = isSuperAdmin
     ? superAdminNavItems
     : isAdmin
-    ? adminNavItems
-    : isSeller
-    ? sellerNavItems
-    : [];
+      ? adminNavItems
+      : isSeller
+        ? sellerNavItems
+        : [];
 
   return (
     <div className="flex h-full flex-col">
