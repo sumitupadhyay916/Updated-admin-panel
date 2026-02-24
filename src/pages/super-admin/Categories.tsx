@@ -539,6 +539,25 @@ export default function Categories() {
                   </FormItem>
                 )}
               />
+                <FormField
+                  control={form.control}
+                  name="noOfProducts"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Product Count (Managed by Database)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          {...field} 
+                          onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
+                          disabled
+                          className="bg-gray-100 italic" 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               <DialogFooter>
                 <Button
                   type="button"

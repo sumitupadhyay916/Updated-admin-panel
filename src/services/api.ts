@@ -372,6 +372,7 @@ export interface CreateProductRequest {
   lowStockThreshold?: number;
   images?: string[];
   tags?: string[];
+  subcategoryId?: number | null;
 }
 
 export interface UpdateProductRequest {
@@ -394,6 +395,7 @@ export interface UpdateProductRequest {
   images?: string[];
   tags?: string[];
   isFeatured?: boolean;
+  subcategoryId?: number | null;
 }
 
 
@@ -1004,5 +1006,42 @@ export const sellerPoliciesApi = {
   },
 };
 
-export default apiClient;
+// ── Subcategories API ────────────────────────────────────────────────────────
 
+export interface Subcategory {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  categoryId: number;
+  category?: { id: number; name: string; slug: string | null };
+}
+
+export const subcategoriesApi = {
+  getAll: async (): Promise<ApiResponse<Subcategory[]>> => {
+    const response = await apiClient.get('/subcategories');
+    return response.data;
+  },
+
+  getByCategory: async (categoryId: number): Promise<ApiResponse<Subcategory[]>> => {
+    const response = await apiClient.get(`/subcategories?categoryId=${categoryId}`);
+    return response.data;
+  },
+
+  create: async (data: { name: string; slug: string; categoryId: number; description?: string }): Promise<ApiResponse<Subcategory>> => {
+    const response = await apiClient.post('/subcategories', data);
+    return response.data;
+  },
+
+  update: async (id: number, data: Partial<{ name: string; slug: string; categoryId: number; description: string }>): Promise<ApiResponse<Subcategory>> => {
+    const response = await apiClient.put(`/subcategories/${id}`, data);
+    return response.data;
+  },
+
+  delete: async (id: number): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete(`/subcategories/${id}`);
+    return response.data;
+  },
+};
+
+export default apiClient;
