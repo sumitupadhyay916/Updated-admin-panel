@@ -119,6 +119,8 @@ export interface Product {
   sellerName: string;
   categoryId: number;
   categoryName: string;
+  subcategoryId: number | null;
+  subcategorySlug: string | null;
   isFeatured: boolean;
   tags: string[];
   createdAt: string;

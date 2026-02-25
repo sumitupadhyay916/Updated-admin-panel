@@ -8,7 +8,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { productsApi, categoriesApi, sellersApi } from '@/services/api';
+import { productsApi, categoriesApi, sellersApi, subcategoriesApi } from '@/services/api';
+import type { Subcategory } from '@/services/api';
 import type { Product, Category, Seller } from '@/types';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
@@ -53,6 +54,7 @@ import { toast } from 'sonner';
 const productFormSchemaWithSeller = z.object({
   name: z.string().min(1, 'Product name is required').min(2, 'Product name must be at least 2 characters'),
   categoryId: z.string().min(1, 'Category is required'),
+  subcategoryId: z.string().optional(),
   sellerId: z.string().optional(),
   price: z.number().min(0.01, 'Price must be greater than 0'),
   stock: z.enum(['available', 'unavailable']),
@@ -62,6 +64,7 @@ const productFormSchemaWithSeller = z.object({
 const productFormSchemaWithoutSeller = z.object({
   name: z.string().min(1, 'Product name is required').min(2, 'Product name must be at least 2 characters'),
   categoryId: z.string().min(1, 'Category is required'),
+  subcategoryId: z.string().optional(),
   sellerId: z.string().optional(),
   price: z.number().min(0.01, 'Price must be greater than 0'),
   stock: z.enum(['available', 'unavailable']),
@@ -73,11 +76,11 @@ export default function ProductsManagement() {
   const { user } = useAuthStore();
   const location = useLocation();
   const isSeller = user?.role === 'seller';
-  const isAdmin = user?.role === 'admin';
-  const isSuperAdmin = user?.role === 'super_admin';
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [sellers, setSellers] = useState<Seller[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  const [editSubcategories, setEditSubcategories] = useState<Subcategory[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
@@ -92,6 +95,8 @@ export default function ProductsManagement() {
   const [isUploading, setIsUploading] = useState(false);
   const [editUploadedImageUrls, setEditUploadedImageUrls] = useState<string[]>([]);
   const [isEditUploading, setIsEditUploading] = useState(false);
+  const [isSubcategoriesLoading, setIsSubcategoriesLoading] = useState(false);
+  const [isEditSubcategoriesLoading, setIsEditSubcategoriesLoading] = useState(false);
 
 
   const isMyProductsPage = useMemo(() => location.pathname.endsWith('/my-products'), [location.pathname]);
@@ -101,6 +106,7 @@ export default function ProductsManagement() {
     defaultValues: {
       name: '',
       categoryId: '',
+      subcategoryId: '',
       sellerId: isSeller ? '' : '__my__',
       price: 0,
       stock: 'available',
@@ -112,6 +118,7 @@ export default function ProductsManagement() {
     defaultValues: {
       name: '',
       categoryId: '',
+      subcategoryId: '',
       sellerId: isSeller ? '' : '__my__',
       price: 0,
       stock: 'available',
@@ -225,10 +232,12 @@ export default function ProductsManagement() {
         form.reset({
           name: '',
           categoryId: '',
+          subcategoryId: '',
           sellerId: isSeller ? '' : '__my__',
           price: 0,
           stock: 'available',
         });
+        setSubcategories([]);
 
         await loadProducts();
         await loadCategories(); // Refresh categories to update product count
@@ -249,15 +258,49 @@ export default function ProductsManagement() {
     setIsViewDialogOpen(true);
   };
 
-  const openEditDialog = useCallback((product: Product) => {
+  const openEditDialog = useCallback(async (product: Product) => {
     setEditingProduct(product);
+    
+    // Initial reset with available data
     editForm.reset({
       name: product.name,
       categoryId: product.categoryId.toString(),
+      subcategoryId: product.subcategoryId?.toString() || '',
       sellerId: !isSeller && user?.id && product.sellerId === user.id ? '__my__' : (product.sellerId || ''),
       price: product.price,
       stock: product.stock,
     });
+
+    // Load subcategories for the current category and attempt to match legacy slug if ID is missing
+    if (product.categoryId) {
+      setIsEditSubcategoriesLoading(true);
+      try {
+        const res = await subcategoriesApi.getByCategory(product.categoryId);
+        if (res.success) {
+          const subs = res.data || [];
+          setEditSubcategories(subs);
+          
+          // If subcategoryId is missing but we have a slug, try to find the ID and update form
+          if (!product.subcategoryId && product.subcategorySlug) {
+            const match = subs.find(s => s.slug === product.subcategorySlug);
+            if (match) {
+              editForm.setValue('subcategoryId', match.id.toString());
+            }
+          } else {
+            // Even if ID is present, re-apply it after subs are loaded to ensure the Select component matches it
+            const currentSubId = editForm.getValues('subcategoryId');
+            if (currentSubId) {
+              editForm.setValue('subcategoryId', currentSubId);
+            }
+          }
+        }
+      } catch (err) { 
+        console.error('Failed to load subcategories for edit', err);
+        setEditSubcategories([]); 
+      } finally {
+        setIsEditSubcategoriesLoading(false);
+      }
+    }
     setIsEditDialogOpen(true);
   }, [editForm, isSeller, user?.id]);
 
@@ -271,6 +314,9 @@ export default function ProductsManagement() {
         categoryId: parseInt(values.categoryId, 10),
         price: values.price,
         stock: values.stock,
+        subcategoryId: values.subcategoryId && values.subcategoryId !== '__none__'
+          ? parseInt(values.subcategoryId, 10)
+          : null,
       };
       if (editUploadedImageUrls.length > 0) {
         payload.images = editUploadedImageUrls;
@@ -295,13 +341,14 @@ export default function ProductsManagement() {
         setEditingProduct(null);
         setEditUploadedImageUrls([]);
         editForm.reset({
-
           name: '',
           categoryId: '',
+          subcategoryId: '',
           sellerId: '',
           price: 0,
           stock: 'available',
         });
+        setEditSubcategories([]);
         await loadProducts();
         await loadCategories(); // Refresh categories to update product count
       } else {
@@ -506,7 +553,7 @@ export default function ProductsManagement() {
 
     // Filter out Categories column for sellers
     if (isSeller) {
-      return allColumns.filter(col => col.accessorKey !== 'categoryName');
+      return allColumns.filter(col => (col as any).accessorKey !== 'categoryName');
     }
 
     return allColumns;
@@ -632,10 +679,12 @@ export default function ProductsManagement() {
             form.reset({
               name: '',
               categoryId: '',
+              subcategoryId: '',
               sellerId: isSeller ? '' : '__my__',
               price: 0,
               stock: 'available',
             });
+            setSubcategories([]);
           }
         }}
       >
@@ -666,7 +715,26 @@ export default function ProductsManagement() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Category</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                      onValueChange={async (val) => {
+                        field.onChange(val);
+                        form.setValue('subcategoryId', '');
+                        if (val) {
+                          setIsSubcategoriesLoading(true);
+                          try {
+                            const res = await subcategoriesApi.getByCategory(parseInt(val, 10));
+                            setSubcategories(res.success ? (res.data || []) : []);
+                          } catch { 
+                            setSubcategories([]); 
+                          } finally {
+                            setIsSubcategoriesLoading(false);
+                          }
+                        } else {
+                          setSubcategories([]);
+                        }
+                      }}
+                      value={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a category" />
@@ -680,6 +748,36 @@ export default function ProductsManagement() {
                               {category.name}
                             </SelectItem>
                           ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {/* Subcategory dropdown — shows after category chosen */}
+              <FormField
+                control={form.control}
+                name="subcategoryId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Subcategory <span className="text-gray-400 font-normal">(optional)</span></FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value || '__none__'} 
+                        disabled={isSubcategoriesLoading || (!!form.getValues('categoryId') && subcategories.length === 0)}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder={isSubcategoriesLoading ? "Loading..." : (form.getValues('categoryId') && subcategories.length === 0 ? "No subcategories" : "Select subcategory (optional)")} />
+                          </SelectTrigger>
+                        </FormControl>
+                      <SelectContent>
+                        <SelectItem value="__none__">— None —</SelectItem>
+                        {subcategories.map((sub) => (
+                          <SelectItem key={sub.id} value={sub.id.toString()}>
+                            {sub.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -876,6 +974,7 @@ export default function ProductsManagement() {
             editForm.reset({
               name: '',
               categoryId: '',
+              subcategoryId: '',
               sellerId: isSeller ? '' : '__my__',
               price: 0,
               stock: 'available',
@@ -910,7 +1009,26 @@ export default function ProductsManagement() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Category</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                      onValueChange={async (val) => {
+                        field.onChange(val);
+                        editForm.setValue('subcategoryId', '');
+                        if (val) {
+                          setIsEditSubcategoriesLoading(true);
+                          try {
+                            const res = await subcategoriesApi.getByCategory(parseInt(val, 10));
+                            setEditSubcategories(res.success ? (res.data || []) : []);
+                          } catch { 
+                            setEditSubcategories([]); 
+                          } finally {
+                            setIsEditSubcategoriesLoading(false);
+                          }
+                        } else {
+                          setEditSubcategories([]);
+                        }
+                      }}
+                      value={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a category" />
@@ -924,6 +1042,36 @@ export default function ProductsManagement() {
                               {category.name}
                             </SelectItem>
                           ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {/* Subcategory dropdown */}
+              <FormField
+                control={editForm.control}
+                name="subcategoryId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Subcategory <span className="text-gray-400 font-normal">(optional)</span></FormLabel>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      value={field.value || '__none__'} 
+                      disabled={isEditSubcategoriesLoading || (!!editForm.getValues('categoryId') && editSubcategories.length === 0)}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={isEditSubcategoriesLoading ? "Loading..." : (editForm.getValues('categoryId') && editSubcategories.length === 0 ? "No subcategories" : "Select subcategory (optional)")} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="__none__">— None —</SelectItem>
+                        {editSubcategories.map((sub) => (
+                          <SelectItem key={sub.id} value={sub.id.toString()}>
+                            {sub.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />

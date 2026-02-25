@@ -205,12 +205,12 @@ const sellerNavItems: NavItem[] = [
     icon: ShoppingCart,
     roles: ['seller'],
   },
-  // {
-  //   label: 'My Sales',
-  //   href: '/seller/sales',
-  //   icon: BarChart3,
-  //   roles: ['seller'],
-  // },
+  {
+    label: 'My Payouts',
+    href: '/seller/payouts',
+    icon: Wallet,
+    roles: ['seller'],
+  },
   {
     label: 'Coupons',
     href: '/seller/coupons',
