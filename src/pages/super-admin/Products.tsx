@@ -177,8 +177,11 @@ export default function ProductsManagement() {
   useEffect(() => {
     void loadProducts();
     void loadCategories();
+     if (user?.role === 'admin' || user?.role === 'super_admin') {
     void loadSellers();
-  }, [loadProducts, loadCategories, loadSellers]);
+  }
+    // void loadSellers();
+  }, [loadProducts, loadCategories, loadSellers, user?.role]);
 
   // If on My Products page, force filter to my products for admin/super_admin
   useEffect(() => {
@@ -869,7 +872,7 @@ export default function ProductsManagement() {
           setIsEditDialogOpen(open);
           if (!open) {
             setEditingProduct(null);
-            setEditUploadedImageUrl('');
+            setEditUploadedImageUrls([]);
             editForm.reset({
               name: '',
               categoryId: '',
@@ -1010,13 +1013,13 @@ export default function ProductsManagement() {
                         className="h-20 w-20 rounded-lg object-cover border"
                       />
                       <div className="flex-1">
-                        <p className="text-sm text-green-600 font-medium">✓ {editUploadedImageUrl ? 'New image uploaded' : 'Current image'}</p>
-                        <p className="text-xs text-gray-500 truncate max-w-[200px]">{editUploadedImageUrl || editingProduct?.images?.[0]}</p>
+                        <p className="text-sm text-green-600 font-medium">✓ {editUploadedImageUrls.length > 0 ? 'New image uploaded' : 'Current image'}</p>
+                        <p className="text-xs text-gray-500 truncate max-w-[200px]">{editUploadedImageUrls[0] || editingProduct?.images?.[0]}</p>
                       </div>
-                      {editUploadedImageUrl && (
+                      {editUploadedImageUrls.length > 0 && (
                         <button
                           type="button"
-                          onClick={() => setEditUploadedImageUrl('')}
+                          onClick={() => setEditUploadedImageUrls([])}
                           className="text-gray-400 hover:text-red-500 transition-colors"
                         >
                           <X className="h-4 w-4" />
@@ -1035,31 +1038,39 @@ export default function ProductsManagement() {
                           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
                             <ImageIcon className="h-6 w-6 text-gray-400" />
                           </div>
-                          <span className="text-sm text-gray-500">Click to upload product image</span>
+                          <span className="text-sm text-gray-500">Click to upload product images</span>
                           <span className="text-xs text-gray-400">JPG, PNG, WEBP up to 10MB</span>
                         </>
                       )}
                       <input
                         type="file"
                         accept="image/*"
+                        multiple
                         className="hidden"
                         disabled={isEditUploading}
                         onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
+                          const files = Array.from(e.target.files || []);
+                          if (files.length === 0) return;
                           setIsEditUploading(true);
                           try {
-                            const result = await productsApi.uploadImage(file);
-                            if (result.success && result.data?.url) {
-                              setEditUploadedImageUrl(result.data.url);
-                              toast.success('Image uploaded successfully');
+                            const uploadPromises = files.map(file => productsApi.uploadImage(file));
+                            const results = await Promise.all(uploadPromises);
+                            
+                            const successfulUrls = results
+                              .filter(result => result.success && result.data?.url)
+                              .map(result => result.data!.url);
+                            
+                            if (successfulUrls.length > 0) {
+                              setEditUploadedImageUrls(prev => [...prev, ...successfulUrls]);
+                              toast.success(`${successfulUrls.length} image(s) uploaded successfully`);
                             } else {
-                              toast.error('Failed to upload image');
+                              toast.error('Failed to upload images');
                             }
                           } catch {
-                            toast.error('Failed to upload image');
+                            toast.error('Failed to upload images');
                           } finally {
                             setIsEditUploading(false);
+                            e.target.value = '';
                           }
                         }}
                       />
