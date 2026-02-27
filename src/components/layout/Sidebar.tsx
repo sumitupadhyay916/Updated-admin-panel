@@ -181,12 +181,12 @@ const sellerNavItems: NavItem[] = [
     icon: Package,
     roles: ['seller'],
   },
-  // {
-  //   label: 'My Inventory',
-  //   href: '/seller/inventory',
-  //   icon: Warehouse,
-  //   roles: ['seller'],
-  // },
+  {
+    label: 'Inventory',
+    href: '/seller/inventory',
+    icon: Warehouse,
+    roles: ['seller'],
+  },
   {
     label: 'My Orders',
     href: '/seller/orders',

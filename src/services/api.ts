@@ -4,12 +4,6 @@ import type {
   InternalAxiosRequestConfig,
   AxiosError,
 } from "axios";
-import type { User, UserRole, SuperAdmin } from "@/types";
-import { mockAdmins, mockSellers } from "@/services/mockData";
-
-// Toggle this flag via env to switch between mock auth and real backend auth
-// Defaults to real backend when not explicitly set
-const USE_MOCK_AUTH = import.meta.env.VITE_USE_MOCK_AUTH === "true";
 
 // API base URL
 const API_BASE_URL =
@@ -98,88 +92,8 @@ export interface ChangePasswordRequest {
   newPassword: string;
 }
 
-// ============================================
-// MOCK AUTH IMPLEMENTATION
-// ============================================
-
-const mockSuperAdmin: SuperAdmin = {
-  id: "sa-001",
-  email: "super@divine.com",
-  name: "Super Admin",
-  role: "super_admin",
-  avatar:
-    "https://api.dicebear.com/7.x/avataaars/svg?seed=super-admin",
-  phone: "+91-9876543210",
-  status: "active",
-  createdAt: "2024-01-01",
-  updatedAt: "2024-01-01",
-  permissions: [
-    "manage_sellers",
-    "manage_products",
-    "manage_orders",
-    "view_reports",
-    "all",
-  ],
-};
-
-type MockAuthUser = {
-  email: string;
-  password: string;
-  role: UserRole;
-  user: User;
-};
-
-const mockAuthUsers: MockAuthUser[] = [
-  {
-    email: "super@divine.com",
-    password: "admin123",
-    role: "super_admin",
-    user: mockSuperAdmin,
-  },
-  {
-    email: "admin@divine.com",
-    password: "admin123",
-    role: "admin",
-    user: mockAdmins[0] as User,
-  },
-  {
-    email: "seller@divine.com",
-    password: "seller123",
-    role: "seller",
-    user: mockSellers[0] as User,
-  },
-];
-
 export const authApi = {
   login: async (data: LoginRequest): Promise<ApiResponse<{ user: unknown; token: string }>> => {
-    if (USE_MOCK_AUTH) {
-      const match = mockAuthUsers.find(
-        (u) =>
-          u.email === data.email &&
-          u.password === data.password &&
-          (!data.role || u.role === data.role),
-      );
-
-      if (!match) {
-        return {
-          success: false,
-          message: "Invalid credentials",
-        };
-      }
-
-      const token = `mock-token-${match.user.id}`;
-      localStorage.setItem("token", token);
-
-      return {
-        success: true,
-        message: "Login successful",
-        data: {
-          user: match.user,
-          token,
-        },
-      };
-    }
-
     const response = await apiClient.post("/auth/login", data);
     if (response.data.success && response.data.data?.token) {
       localStorage.setItem("token", response.data.data.token);
@@ -469,6 +383,49 @@ export const productsApi = {
     const response = await apiClient.post('/products/upload-image', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
+    return response.data;
+  },
+
+  // Inventory management endpoints
+  getInventoryStats: async (): Promise<ApiResponse<{
+    totalProducts: number;
+    totalStockQuantity: number;
+    deliveredQuantity: number;
+    reservedQuantity: number;
+    shippingQuantity: number;
+    lowStockProducts: number;
+  }>> => {
+    const response = await apiClient.get('/products/inventory/stats');
+    return response.data;
+  },
+
+  getCartDetails: async (): Promise<ApiResponse<Array<{
+    productId: number;
+    productPid: string;
+    productName: string;
+    productImage: string | null;
+    productPrice: number;
+    reservedQuantity: number;
+    numberOfCarts: number;
+    carts: Array<{
+      cartId: string;
+      userId: string;
+      quantity: number;
+      addedAt: string;
+      updatedAt: string;
+    }>;
+  }>>> => {
+    const response = await apiClient.get('/products/inventory/cart-details');
+    return response.data;
+  },
+
+  getProductInventoryDetails: async (id: string | number): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.get(`/products/${id}/inventory-details`);
+    return response.data;
+  },
+
+  adjustProductStock: async (id: string | number, adjustment: number): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.post(`/products/${id}/adjust-stock`, { adjustment });
     return response.data;
   },
 };
