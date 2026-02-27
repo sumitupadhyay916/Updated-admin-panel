@@ -25,6 +25,7 @@ import ListCoupon from '@/pages/seller/Coupons/ListCoupon';
 import CreateCoupon from '@/pages/seller/Coupons/CreateCoupon';
 import AbandonedCarts from '@/pages/seller/AbandonedCarts';
 import SellerSupportPages from '@/pages/seller/SellerSupportPages';
+import SellerInventory from '@/pages/seller/Inventory';
 
 // Protected Route Component
 function ProtectedRoute({ 
@@ -141,6 +142,7 @@ function App() {
           }
         >
           <Route path="/seller" element={<SellerDashboard />} />
+          <Route path="/seller/inventory" element={<SellerInventory />} />
           <Route path="/seller/products" element={<ProductsManagement />} />
           <Route path="/seller/orders" element={<OrdersManagement />} />
           <Route path="/seller/payouts" element={<PayoutsManagement />} />
