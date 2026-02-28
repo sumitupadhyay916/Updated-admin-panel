@@ -29,6 +29,9 @@ const routeAccessRules: Record<UserRole, string[]> = {
   seller: [
     '/seller',
   ],
+  staff: [
+    '/seller',
+  ],
   consumer: [
     '/consumer',
   ],
@@ -56,9 +59,13 @@ export const useAuthStore = create<AuthState>()(
             const { user, token } = response.data as { user: User; token: string };
 
             // Check if role matches (if specified)
-            if (credentials.role && user.role !== credentials.role) {
-              set({ isLoading: false });
-              return false;
+            if (credentials.role) {
+              if (credentials.role === 'seller' && user.role === 'staff') {
+                // Allow staff to login via the seller portal
+              } else if (user.role !== credentials.role) {
+                set({ isLoading: false });
+                return false;
+              }
             }
 
             set({
@@ -104,9 +111,14 @@ export const useAuthStore = create<AuthState>()(
         if (!user) return false;
 
         if (user.role === 'super_admin') return true;
-        if ('permissions' in user && Array.isArray((user as SuperAdmin | Admin).permissions)) {
-          return (user as SuperAdmin | Admin).permissions.includes(permission) ||
-            (user as SuperAdmin | Admin).permissions.includes('all');
+        
+        // Both admins and staff can have permissions arrays
+        if (['admin', 'staff'].includes(user.role)) {
+          const userWithPerms = user as any;
+          if (Array.isArray(userWithPerms.permissions)) {
+            return userWithPerms.permissions.includes(permission) ||
+                   userWithPerms.permissions.includes('all');
+          }
         }
         return false;
       },
@@ -139,6 +151,7 @@ export const useRole = () => {
     isSuperAdmin: user?.role === 'super_admin',
     isAdmin: user?.role === 'admin',
     isSeller: user?.role === 'seller',
+    isStaff: user?.role === 'staff',
     isConsumer: user?.role === 'consumer',
   };
 };

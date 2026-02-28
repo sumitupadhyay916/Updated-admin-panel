@@ -1044,4 +1044,26 @@ export const subcategoriesApi = {
   },
 };
 
+export const staffApi = {
+  getStaff: async (): Promise<ApiResponse<unknown[]>> => {
+    const response = await apiClient.get('/staff');
+    return response.data;
+  },
+  
+  createStaff: async (data: any): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.post('/staff', data);
+    return response.data;
+  },
+  
+  updateStaff: async (id: string, data: any): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.put(`/staff/${id}`, data);
+    return response.data;
+  },
+  
+  deleteStaff: async (id: string): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete(`/staff/${id}`);
+    return response.data;
+  }
+};
+
 export default apiClient;
