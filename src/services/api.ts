@@ -21,7 +21,7 @@ const apiClient: AxiosInstance = axios.create({
 // Request interceptor - add auth token
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -36,8 +36,8 @@ apiClient.interceptors.response.use(
   (error: AxiosError) => {
     if (error.response?.status === 401) {
       // Token expired or invalid - logout user
-      localStorage.removeItem("token");
-      localStorage.removeItem("auth-storage");
+      sessionStorage.removeItem("token");
+      sessionStorage.removeItem("auth-storage");
       window.location.href = "/login";
     }
     return Promise.reject(error);
@@ -96,7 +96,7 @@ export const authApi = {
   login: async (data: LoginRequest): Promise<ApiResponse<{ user: unknown; token: string }>> => {
     const response = await apiClient.post("/auth/login", data);
     if (response.data.success && response.data.data?.token) {
-      localStorage.setItem("token", response.data.data.token);
+      sessionStorage.setItem("token", response.data.data.token);
     }
     return response.data;
   },
@@ -104,7 +104,7 @@ export const authApi = {
   register: async (data: RegisterRequest): Promise<ApiResponse<{ user: unknown; token: string }>> => {
     const response = await apiClient.post('/auth/register', data);
     if (response.data.success && response.data.data?.token) {
-      localStorage.setItem('token', response.data.data.token);
+      sessionStorage.setItem('token', response.data.data.token);
     }
     return response.data;
   },
@@ -120,8 +120,8 @@ export const authApi = {
   },
 
   logout: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('auth-storage');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('auth-storage');
   },
 };
 
@@ -999,6 +999,28 @@ export const subcategoriesApi = {
     const response = await apiClient.delete(`/subcategories/${id}`);
     return response.data;
   },
+};
+
+export const staffApi = {
+  getStaff: async (): Promise<ApiResponse<unknown[]>> => {
+    const response = await apiClient.get('/staff');
+    return response.data;
+  },
+  
+  createStaff: async (data: any): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.post('/staff', data);
+    return response.data;
+  },
+  
+  updateStaff: async (id: string, data: any): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.put(`/staff/${id}`, data);
+    return response.data;
+  },
+  
+  deleteStaff: async (id: string): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete(`/staff/${id}`);
+    return response.data;
+  }
 };
 
 export default apiClient;

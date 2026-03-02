@@ -2,7 +2,7 @@
 // ROLE & USER TYPES
 // ============================================
 
-export type UserRole = 'super_admin' | 'admin' | 'seller' | 'consumer';
+export type UserRole = 'super_admin' | 'admin' | 'seller' | 'consumer' | 'staff';
 
 export interface User {
   id: string;

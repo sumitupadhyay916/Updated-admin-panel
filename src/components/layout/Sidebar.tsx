@@ -39,6 +39,7 @@ interface NavItem {
   href: string;
   icon: React.ElementType;
   roles: string[];
+  permissions?: string[];
   children?: NavItem[];
 }
 
@@ -174,12 +175,13 @@ const adminNavItems: NavItem[] = [
 
 // Seller Navigation
 const sellerNavItems: NavItem[] = [
-  { label: 'Dashboard', href: '/seller', icon: LayoutDashboard, roles: ['seller'] },
+  { label: 'Dashboard', href: '/seller', icon: LayoutDashboard, roles: ['seller', 'staff'] },
   {
     label: 'My Products',
     href: '/seller/products',
     icon: Package,
-    roles: ['seller'],
+    roles: ['seller', 'staff'],
+    permissions: ['manage_products'],
   },
   {
     label: 'Inventory',
@@ -191,19 +193,22 @@ const sellerNavItems: NavItem[] = [
     label: 'My Orders',
     href: '/seller/orders',
     icon: ShoppingCart,
-    roles: ['seller'],
+    roles: ['seller', 'staff'],
+    permissions: ['manage_orders'],
   },
-  // {
-  //   label: 'My Sales',
-  //   href: '/seller/sales',
-  //   icon: BarChart3,
-  //   roles: ['seller'],
-  // },
   {
     label: 'Abandoned Carts',
     href: '/seller/abandoned-carts',
     icon: ShoppingCart,
-    roles: ['seller'],
+    roles: ['seller', 'staff'],
+    permissions: ['manage_orders'],
+  },
+  {
+    label: 'My Staff',
+    href: '/seller/staff',
+    icon: Users,
+    roles: ['seller', 'staff'],
+    permissions: ['manage_staff'],
   },
   {
     label: 'My Payouts',
@@ -215,37 +220,25 @@ const sellerNavItems: NavItem[] = [
     label: 'Coupons',
     href: '/seller/coupons',
     icon: Ticket,
-    roles: ['seller'],
+    roles: ['seller', 'staff'],
+    permissions: ['manage_coupons'],
     children: [
-      { label: 'List Coupon', href: '/seller/coupons', icon: Ticket, roles: ['seller'] },
-      { label: 'Create Coupon ', href: '/seller/coupons/create', icon: ShoppingCart, roles: ['seller'] },
+      { label: 'List Coupon', href: '/seller/coupons', icon: Ticket, roles: ['seller', 'staff'], permissions: ['manage_coupons'] },
+      { label: 'Create Coupon ', href: '/seller/coupons/create', icon: ShoppingCart, roles: ['seller', 'staff'], permissions: ['manage_coupons'] },
     ],
   },
-  
-  
-  // {
-  //   label: 'My Consumers',
-  //   href: '/seller/consumers',
-  //   icon: Users,
-  //   roles: ['seller'],
-  // },
   {
     label: 'Settings',
     href: '/seller/settings',
     icon: Settings,
-    roles: ['seller'],
+    roles: ['seller', 'staff'],
+    permissions: ['manage_settings'],
     children: [
-      { label: 'FAQs', href: '/seller/settings/faqs', icon: HelpCircle, roles: ['seller'] },
-      { label: 'Privacy Policy', href: '/seller/settings/privacy-policy', icon: Shield, roles: ['seller'] },
-      { label: 'Terms & Conditions', href: '/seller/settings/terms-conditions', icon: FileText, roles: ['seller'] },
+      { label: 'FAQs', href: '/seller/settings/faqs', icon: HelpCircle, roles: ['seller', 'staff'], permissions: ['manage_settings'] },
+      { label: 'Privacy Policy', href: '/seller/settings/privacy-policy', icon: Shield, roles: ['seller', 'staff'], permissions: ['manage_settings'] },
+      { label: 'Terms & Conditions', href: '/seller/settings/terms-conditions', icon: FileText, roles: ['seller', 'staff'], permissions: ['manage_settings'] },
     ],
   },
-  // {
-  //   label: 'Profile',
-  //   href: '/seller/profile',
-  //   icon: Settings,
-  //   roles: ['seller'],
-  // },
 ];
 
 interface SidebarProps {
@@ -312,15 +305,40 @@ function NavItemComponent({ item, depth = 0 }: { item: NavItem; depth?: number }
 function SidebarContent() {
   const { user, logout } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
-  const { isSuperAdmin, isAdmin, isSeller } = useRole();
+  const { isSuperAdmin, isAdmin, isSeller, isStaff } = useRole();
 
-  const navItems = isSuperAdmin
+  const userPermissions = (user as any)?.permissions || (user as any)?.staffProfile?.permissions || [];
+
+  const filterNavItems = (items: NavItem[]): NavItem[] => {
+    return items.map(item => ({ ...item })).filter(item => {
+      // 1. Check Role
+      if (!item.roles.includes(user?.role || '')) return false;
+      
+      // 2. Check Permissions for Staff
+      if (user?.role === 'staff' && item.permissions) {
+         if (!item.permissions.some(p => userPermissions.includes(p)) && !userPermissions.includes('all')) {
+           return false;
+         }
+      }
+      
+      // Filter children
+      if (item.children) {
+        item.children = filterNavItems(item.children);
+        if (item.children.length === 0) return false;
+      }
+      return true;
+    });
+  };
+
+  const baseItems = isSuperAdmin
     ? superAdminNavItems
     : isAdmin
       ? adminNavItems
-      : isSeller
+      : (isSeller || isStaff)
         ? sellerNavItems
         : [];
+
+  const navItems = filterNavItems(baseItems);
 
   return (
     <div className="flex h-full flex-col">

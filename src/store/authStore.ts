@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { User, UserRole, LoginCredentials, SuperAdmin, Admin } from '@/types';
+// UserRole is probably missing 'staff', but this is just an example of modifying imports if needed.
+import type { User, UserRole as BaseUserRole, LoginCredentials, SuperAdmin, Admin } from '@/types';
+type UserRole = BaseUserRole | 'staff';
 import { authApi } from '@/services/api';
 
 interface AuthState {
@@ -27,6 +29,9 @@ const routeAccessRules: Record<UserRole, string[]> = {
     '/seller',
   ],
   seller: [
+    '/seller',
+  ],
+  staff: [
     '/seller',
   ],
   consumer: [
@@ -56,9 +61,15 @@ export const useAuthStore = create<AuthState>()(
             const { user, token } = response.data as { user: User; token: string };
 
             // Check if role matches (if specified)
-            if (credentials.role && user.role !== credentials.role) {
-              set({ isLoading: false });
-              return false;
+            if (credentials.role) {
+              if (credentials.role === 'staff' && user.role === 'staff') {
+                // Allow staff directly 
+              } else if (credentials.role === 'seller' && user.role === 'staff') {
+                // Allow staff to login via the seller portal
+              } else if (user.role !== credentials.role) {
+                set({ isLoading: false });
+                return false;
+              }
             }
 
             set({
@@ -104,9 +115,14 @@ export const useAuthStore = create<AuthState>()(
         if (!user) return false;
 
         if (user.role === 'super_admin') return true;
-        if ('permissions' in user && Array.isArray((user as SuperAdmin | Admin).permissions)) {
-          return (user as SuperAdmin | Admin).permissions.includes(permission) ||
-            (user as SuperAdmin | Admin).permissions.includes('all');
+        
+        // Both admins and staff can have permissions arrays
+        if (['admin', 'staff'].includes(user.role)) {
+          const userWithPerms = user as any;
+          if (Array.isArray(userWithPerms.permissions)) {
+            return userWithPerms.permissions.includes(permission) ||
+                   userWithPerms.permissions.includes('all');
+          }
         }
         return false;
       },
@@ -139,6 +155,7 @@ export const useRole = () => {
     isSuperAdmin: user?.role === 'super_admin',
     isAdmin: user?.role === 'admin',
     isSeller: user?.role === 'seller',
+    isStaff: user?.role === 'staff',
     isConsumer: user?.role === 'consumer',
   };
 };
