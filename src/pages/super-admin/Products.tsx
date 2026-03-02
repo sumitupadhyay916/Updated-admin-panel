@@ -45,7 +45,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
@@ -58,6 +58,17 @@ const productFormSchemaWithSeller = z.object({
   sellerId: z.string().optional(),
   price: z.number().min(0.01, 'Price must be greater than 0'),
   stock: z.enum(['available', 'unavailable']),
+  variants: z.array(z.object({
+    price: z.number().min(0, 'Variant price cannot be negative'),
+    comparePrice: z.number().optional().nullable(),
+    stock: z.number().min(0, 'Variant stock cannot be negative'),
+    images: z.array(z.string()).optional(),
+    optionValueNames: z.record(z.string(), z.string()),
+  })).optional(),
+  options: z.array(z.object({
+    name: z.string().min(1, 'Option name is required'),
+    values: z.array(z.string().min(1, 'Option value is required')),
+  })).optional(),
 });
 
 // Schema for seller (sellerId not required, will be auto-set)
@@ -68,6 +79,14 @@ const productFormSchemaWithoutSeller = z.object({
   sellerId: z.string().optional(),
   price: z.number().min(0.01, 'Price must be greater than 0'),
   stock: z.enum(['available', 'unavailable']),
+  variants: z.array(z.object({
+    color: z.string().optional(),
+    size: z.string().optional(),
+    price: z.number().min(0, 'Variant price cannot be negative'),
+    comparePrice: z.number().optional(),
+    stock: z.number().min(0, 'Variant stock cannot be negative'),
+    imageUrl: z.string().optional(),
+  })).optional(),
 });
 
 type ProductFormValues = z.infer<typeof productFormSchemaWithSeller>;
@@ -98,11 +117,16 @@ export default function ProductsManagement() {
   const [isSubcategoriesLoading, setIsSubcategoriesLoading] = useState(false);
   const [isEditSubcategoriesLoading, setIsEditSubcategoriesLoading] = useState(false);
 
+  // Quick Create State
+  const [isQuickAddSubcategoryOpen, setIsQuickAddSubcategoryOpen] = useState(false);
+  const [quickAddName, setQuickAddName] = useState('');
+  const [quickAddDesc, setQuickAddDesc] = useState('');
+
 
   const isMyProductsPage = useMemo(() => location.pathname.endsWith('/my-products'), [location.pathname]);
 
   const form = useForm<ProductFormValues>({
-    resolver: zodResolver(isSeller ? productFormSchemaWithoutSeller : productFormSchemaWithSeller),
+    resolver: zodResolver(isSeller ? productFormSchemaWithoutSeller : productFormSchemaWithSeller) as any,
     defaultValues: {
       name: '',
       categoryId: '',
@@ -110,11 +134,13 @@ export default function ProductsManagement() {
       sellerId: isSeller ? '' : '__my__',
       price: 0,
       stock: 'available',
+      options: [],
+      variants: [],
     },
   });
 
   const editForm = useForm<ProductFormValues>({
-    resolver: zodResolver(isSeller ? productFormSchemaWithoutSeller : productFormSchemaWithSeller),
+    resolver: zodResolver(isSeller ? productFormSchemaWithoutSeller : productFormSchemaWithSeller) as any,
     defaultValues: {
       name: '',
       categoryId: '',
@@ -122,8 +148,56 @@ export default function ProductsManagement() {
       sellerId: isSeller ? '' : '__my__',
       price: 0,
       stock: 'available',
+      options: [],
+      variants: [],
     },
   });
+
+  const { fields: variantFields, remove: removeVariant, replace: replaceVariants } = useFieldArray({
+    control: form.control,
+    name: "variants"
+  });
+
+  const { fields: optionFields, append: appendOption, remove: removeOption } = useFieldArray({
+    control: form.control,
+    name: "options"
+  });
+
+  const { fields: editVariantFields, remove: removeEditVariant, replace: replaceEditVariants } = useFieldArray({
+    control: editForm.control,
+    name: "variants"
+  });
+
+  const { fields: editOptionFields, append: appendEditOption, remove: removeEditOption } = useFieldArray({
+    control: editForm.control,
+    name: "options"
+  });
+
+  const generateVariants = useCallback((options: { name: string, values: string[] }[]) => {
+    if (options.length === 0) return [];
+
+    let combinations: Record<string, string>[] = [{}];
+
+    options.forEach(option => {
+      const newCombinations: Record<string, string>[] = [];
+      combinations.forEach(combo => {
+        option.values.forEach(value => {
+          newCombinations.push({
+            ...combo,
+            [option.name]: value
+          });
+        });
+      });
+      combinations = newCombinations;
+    });
+
+    return combinations.map(combo => ({
+      price: form.getValues('price') || 0,
+      stock: 0,
+      optionValueNames: combo,
+      images: []
+    }));
+  }, [form]);
 
   const loadProducts = useCallback(async () => {
     setIsLoading(true);
@@ -184,9 +258,9 @@ export default function ProductsManagement() {
   useEffect(() => {
     void loadProducts();
     void loadCategories();
-     if (user?.role === 'admin' || user?.role === 'super_admin') {
-    void loadSellers();
-  }
+    if (user?.role === 'admin' || user?.role === 'super_admin') {
+      void loadSellers();
+    }
     // void loadSellers();
   }, [loadProducts, loadCategories, loadSellers, user?.role]);
 
@@ -207,7 +281,11 @@ export default function ProductsManagement() {
         categoryId: parseInt(values.categoryId, 10),
         price: values.price,
         stock: values.stock,
+        variants: values.variants,
       };
+      if (values.subcategoryId && values.subcategoryId !== '__none__') {
+        payload.subcategoryId = parseInt(values.subcategoryId, 10);
+      }
       if (uploadedImageUrls.length > 0) {
         payload.images = uploadedImageUrls;
       }
@@ -260,7 +338,7 @@ export default function ProductsManagement() {
 
   const openEditDialog = useCallback(async (product: Product) => {
     setEditingProduct(product);
-    
+
     // Initial reset with available data
     editForm.reset({
       name: product.name,
@@ -269,6 +347,7 @@ export default function ProductsManagement() {
       sellerId: !isSeller && user?.id && product.sellerId === user.id ? '__my__' : (product.sellerId || ''),
       price: product.price,
       stock: product.stock,
+      variants: (product as any).variants || [],
     });
 
     // Load subcategories for the current category and attempt to match legacy slug if ID is missing
@@ -279,7 +358,7 @@ export default function ProductsManagement() {
         if (res.success) {
           const subs = res.data || [];
           setEditSubcategories(subs);
-          
+
           // If subcategoryId is missing but we have a slug, try to find the ID and update form
           if (!product.subcategoryId && product.subcategorySlug) {
             const match = subs.find(s => s.slug === product.subcategorySlug);
@@ -294,9 +373,9 @@ export default function ProductsManagement() {
             }
           }
         }
-      } catch (err) { 
+      } catch (err) {
         console.error('Failed to load subcategories for edit', err);
-        setEditSubcategories([]); 
+        setEditSubcategories([]);
       } finally {
         setIsEditSubcategoriesLoading(false);
       }
@@ -314,6 +393,7 @@ export default function ProductsManagement() {
         categoryId: parseInt(values.categoryId, 10),
         price: values.price,
         stock: values.stock,
+        variants: values.variants,
         subcategoryId: values.subcategoryId && values.subcategoryId !== '__none__'
           ? parseInt(values.subcategoryId, 10)
           : null,
@@ -400,6 +480,44 @@ export default function ProductsManagement() {
     }).format(value);
   };
 
+  const handleQuickCreateSubcategory = async () => {
+    const catId = isAddDialogOpen ? form.getValues('categoryId') : editForm.getValues('categoryId');
+    if (!quickAddName || !catId) return;
+
+    try {
+      setIsLoading(true);
+      const slug = quickAddName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      const response = await subcategoriesApi.create({
+        name: quickAddName,
+        slug,
+        categoryId: parseInt(catId, 10),
+        description: quickAddDesc
+      });
+
+      if (response.success && response.data) {
+        const newSub = response.data as Subcategory;
+        toast.success('Subcategory created');
+        const subRes = await subcategoriesApi.getByCategory(parseInt(catId, 10));
+        if (subRes.success) {
+          if (isAddDialogOpen) {
+            setSubcategories(subRes.data || []);
+            form.setValue('subcategoryId', newSub.id.toString());
+          } else if (isEditDialogOpen) {
+            setEditSubcategories(subRes.data || []);
+            editForm.setValue('subcategoryId', newSub.id.toString());
+          }
+        }
+        setIsQuickAddSubcategoryOpen(false);
+        setQuickAddName('');
+        setQuickAddDesc('');
+      }
+    } catch (err) {
+      toast.error('Failed to create subcategory');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const columns: ColumnDef<Product>[] = useMemo(() => {
     const isSeller = user?.role === 'seller';
 
@@ -467,6 +585,18 @@ export default function ProductsManagement() {
           return (
             <div>
               <p className="font-medium text-gray-900 dark:text-white">{product.categoryName || 'Uncategorized'}</p>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'subcategorySlug',
+        header: 'Subcategories',
+        cell: ({ row }: { row: { original: Product } }) => {
+          const product = row.original;
+          return (
+            <div>
+              <p className="font-medium text-gray-900 dark:text-white">{product.subcategorySlug || 'None'}</p>
             </div>
           );
         },
@@ -675,7 +805,7 @@ export default function ProductsManagement() {
         onOpenChange={(open) => {
           setIsAddDialogOpen(open);
           if (!open) {
-            setUploadedImageUrl('');
+            setUploadedImageUrls([]);
             form.reset({
               name: '',
               categoryId: '',
@@ -689,253 +819,469 @@ export default function ProductsManagement() {
         }}
       >
 
-        <DialogContent>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Create Product</DialogTitle>
             <DialogDescription>Add a new product to the marketplace.</DialogDescription>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleCreateProduct)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Product Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter product name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="categoryId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <Select
-                      onValueChange={async (val) => {
-                        field.onChange(val);
-                        form.setValue('subcategoryId', '');
-                        if (val) {
-                          setIsSubcategoriesLoading(true);
-                          try {
-                            const res = await subcategoriesApi.getByCategory(parseInt(val, 10));
-                            setSubcategories(res.success ? (res.data || []) : []);
-                          } catch { 
-                            setSubcategories([]); 
-                          } finally {
-                            setIsSubcategoriesLoading(false);
-                          }
-                        } else {
-                          setSubcategories([]);
-                        }
-                      }}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a category" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {categories
-                          .filter(cat => cat.status === 'active')
-                          .map((category) => (
-                            <SelectItem key={category.id} value={category.id.toString()}>
-                              {category.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {/* Subcategory dropdown — shows after category chosen */}
-              <FormField
-                control={form.control}
-                name="subcategoryId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Subcategory <span className="text-gray-400 font-normal">(optional)</span></FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        value={field.value || '__none__'} 
-                        disabled={isSubcategoriesLoading || (!!form.getValues('categoryId') && subcategories.length === 0)}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder={isSubcategoriesLoading ? "Loading..." : (form.getValues('categoryId') && subcategories.length === 0 ? "No subcategories" : "Select subcategory (optional)")} />
-                          </SelectTrigger>
-                        </FormControl>
-                      <SelectContent>
-                        <SelectItem value="__none__">— None —</SelectItem>
-                        {subcategories.map((sub) => (
-                          <SelectItem key={sub.id} value={sub.id.toString()}>
-                            {sub.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {!isSeller && (
+            <form onSubmit={form.handleSubmit(handleCreateProduct)} className="flex-1 flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto pr-2 space-y-4">
                 <FormField
                   control={form.control}
-                  name="sellerId"
+                  name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Seller</FormLabel>
+                      <FormLabel>Product Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter product name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="categoryId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <div className="flex gap-2">
+                        <Select
+                          onValueChange={async (val) => {
+                            field.onChange(val);
+                            form.setValue('subcategoryId', '');
+                            if (val) {
+                              setIsSubcategoriesLoading(true);
+                              try {
+                                const res = await subcategoriesApi.getByCategory(parseInt(val, 10));
+                                setSubcategories(res.success ? (res.data || []) : []);
+                              } catch {
+                                setSubcategories([]);
+                              } finally {
+                                setIsSubcategoriesLoading(false);
+                              }
+                            } else {
+                              setSubcategories([]);
+                            }
+                          }}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {categories
+                              .filter(cat => cat.status === 'active')
+                              .map((category) => (
+                                <SelectItem key={category.id} value={category.id.toString()}>
+                                  {category.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {/* Subcategory dropdown — shows after category chosen */}
+                <FormField
+                  control={form.control}
+                  name="subcategoryId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Subcategory <span className="text-gray-400 font-normal">(optional)</span></FormLabel>
+                      <div className="flex gap-2">
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value || '__none__'}
+                          disabled={isSubcategoriesLoading || (!!form.getValues('categoryId') && subcategories.length === 0)}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="flex-1">
+                              <SelectValue placeholder={isSubcategoriesLoading ? "Loading..." : (form.getValues('categoryId') && subcategories.length === 0 ? "No subcategories" : "Select subcategory (optional)")} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="__none__">— None —</SelectItem>
+                            {subcategories.map((sub) => (
+                              <SelectItem key={sub.id} value={sub.id.toString()}>
+                                {sub.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setIsQuickAddSubcategoryOpen(true)}
+                          title="Add New Subcategory"
+                          disabled={!form.getValues('categoryId')}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {!isSeller && (
+                  <FormField
+                    control={form.control}
+                    name="sellerId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Seller</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a seller" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="__my__">My Products</SelectItem>
+                            {sellers
+                              .filter(seller => seller.status === 'active')
+                              .map((seller) => (
+                                <SelectItem key={seller.id} value={seller.id}>
+                                  {seller.businessName} ({seller.email})
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+                <FormField
+                  control={form.control}
+                  name="price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Price</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="0.00"
+                          step="0.01"
+                          min="0"
+                          {...field}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          value={field.value || 0}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="stock"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Stock</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select a seller" />
+                            <SelectValue placeholder="Select stock status" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="__my__">My Products</SelectItem>
-                          {sellers
-                            .filter(seller => seller.status === 'active')
-                            .map((seller) => (
-                              <SelectItem key={seller.id} value={seller.id}>
-                                {seller.businessName} ({seller.email})
-                              </SelectItem>
-                            ))}
+                          <SelectItem value="available">Available</SelectItem>
+                          <SelectItem value="unavailable">Unavailable</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              )}
-              <FormField
-                control={form.control}
-                name="price"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Price</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="0.00"
-                        step="0.01"
-                        min="0"
-                        {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                        value={field.value || 0}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="stock"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Stock</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select stock status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="available">Available</SelectItem>
-                        <SelectItem value="unavailable">Unavailable</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {/* Image Uploader - Multiple Images */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Product Images</label>
-                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4">
-                  {/* Display uploaded images */}
-                  {uploadedImageUrls.length > 0 && (
-                    <div className="grid grid-cols-3 gap-3 mb-3">
-                      {uploadedImageUrls.map((url, index) => (
-                        <div key={index} className="relative group">
-                          <img
-                            src={url}
-                            alt={`Product ${index + 1}`}
-                            className="h-20 w-full rounded-lg object-cover border"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setUploadedImageUrls(prev => prev.filter((_, i) => i !== index))}
-                            className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
+
+                {/* Product Options Section */}
+                <div className="space-y-4 pt-4 border-t">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <FormLabel className="text-base font-semibold">Product Options</FormLabel>
+                      <p className="text-sm text-muted-foreground">Add options like Size, Color, etc. and their possible values.</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => appendOption({ name: '', values: [] })}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Option
+                    </Button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {optionFields.map((field, index) => (
+                      <Card key={field.id} className="border-dashed">
+                        <CardContent className="p-4 space-y-4">
+                          <div className="flex items-start gap-4">
+                            <div className="flex-1 space-y-4">
+                              <FormField
+                                control={form.control}
+                                name={`options.${index}.name`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Option Name</FormLabel>
+                                    <FormControl>
+                                      <Input placeholder="e.g. Color" {...field} />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={form.control}
+                                name={`options.${index}.values`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Values (Comma-separated)</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder="e.g. Red, Blue, Green"
+                                        value={Array.isArray(field.value) ? field.value.join(', ') : ''}
+                                        onChange={(e) => {
+                                          const values = e.target.value.split(',').map(v => v.trim()).filter(Boolean);
+                                          field.onChange(values);
+                                        }}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive mt-8"
+                              onClick={() => removeOption(index)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+
+                  {optionFields.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="w-full"
+                      onClick={() => {
+                        const options = form.getValues('options');
+                        const generated = generateVariants(options);
+                        replaceVariants(generated);
+                      }}
+                    >
+                      Generate Variants
+                    </Button>
+                  )}
+                </div>
+
+                {/* Generated Variants Section */}
+                {variantFields.length > 0 && (
+                  <div className="space-y-4 pt-4 border-t">
+                    <FormLabel className="text-base font-semibold">Generated Variants</FormLabel>
+                    <div className="space-y-2">
+                      {variantFields.map((field, index) => (
+                        <Card key={field.id} className="border">
+                          <CardContent className="p-4 space-y-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-medium text-sm bg-muted px-2 py-1 rounded">
+                                {Object.entries(field.optionValueNames || {})
+                                  .map(([key, val]) => `${key}: ${val}`)
+                                  .join(' / ')}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive h-8 p-0"
+                                onClick={() => removeVariant(index)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <FormField
+                                control={form.control}
+                                name={`variants.${index}.price`}
+                                render={({ field: { onChange, ...field } }) => (
+                                  <FormItem>
+                                    <FormLabel>Price (INR) *</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="number"
+                                        placeholder="e.g. 999"
+                                        {...field}
+                                        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={form.control}
+                                name={`variants.${index}.comparePrice`}
+                                render={({ field: { onChange, ...field } }) => (
+                                  <FormItem>
+                                    <FormLabel>Compare Price (INR)</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="number"
+                                        placeholder="e.g. 1499 (original)"
+                                        {...field}
+                                        value={field.value ?? ''}
+                                        onChange={(e) => onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={form.control}
+                                name={`variants.${index}.stock`}
+                                render={({ field: { onChange, ...field } }) => (
+                                  <FormItem>
+                                    <FormLabel>Stock Qty *</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="number"
+                                        placeholder="0"
+                                        {...field}
+                                        onChange={(e) => onChange(parseInt(e.target.value, 10) || 0)}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                              {/* Image selector for this variant */}
+                              <FormItem>
+                                <FormLabel>Variant Image</FormLabel>
+                                <select
+                                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                  value={(form.watch(`variants.${index}.images`) as string[] | undefined)?.[0] || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    form.setValue(`variants.${index}.images`, val ? [val] : []);
+                                  }}
+                                >
+                                  <option value="">— None —</option>
+                                  {uploadedImageUrls.map((url, i) => (
+                                    <option key={i} value={url}>
+                                      Image {i + 1}
+                                    </option>
+                                  ))}
+                                </select>
+                                {/* Preview selected variant image */}
+                                {((form.watch(`variants.${index}.images`) as string[] | undefined)?.[0]) && (
+                                  <img
+                                    src={(form.watch(`variants.${index}.images`) as string[])[0]}
+                                    alt="variant"
+                                    className="mt-2 h-16 w-16 rounded object-cover border"
+                                  />
+                                )}
+                              </FormItem>
+                            </div>
+                          </CardContent>
+                        </Card>
                       ))}
                     </div>
-                  )}
-                  
-                  {/* Upload button */}
-                  <label className="flex flex-col items-center gap-2 cursor-pointer">
-                    {isUploading ? (
-                      <>
-                        <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
-                        <span className="text-sm text-gray-500">Uploading to Cloudinary...</span>
-                      </>
-                    ) : (
-                      <>
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
-                          <ImageIcon className="h-6 w-6 text-gray-400" />
-                        </div>
-                        <span className="text-sm text-gray-500">
-                          {uploadedImageUrls.length > 0 ? 'Add more images' : 'Click to upload product images'}
-                        </span>
-                        <span className="text-xs text-gray-400">JPG, PNG, WEBP up to 10MB</span>
-                      </>
+                  </div>
+                )}
+
+                {/* Image Uploader - Multiple Images */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Product Images</label>
+                  <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                    {/* Display uploaded images */}
+                    {uploadedImageUrls.length > 0 && (
+                      <div className="grid grid-cols-3 gap-3 mb-3">
+                        {uploadedImageUrls.map((url, index) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={url}
+                              alt={`Product ${index + 1}`}
+                              className="h-20 w-full rounded-lg object-cover border"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setUploadedImageUrls(prev => prev.filter((_, i) => i !== index))}
+                              className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      disabled={isUploading}
-                      onChange={async (e) => {
-                        const files = Array.from(e.target.files || []);
-                        if (files.length === 0) return;
-                        
-                        setIsUploading(true);
-                        try {
-                          const uploadPromises = files.map(file => productsApi.uploadImage(file));
-                          const results = await Promise.all(uploadPromises);
-                          
-                          const successfulUrls = results
-                            .filter(result => result.success && result.data?.url)
-                            .map(result => result.data!.url);
-                          
-                          if (successfulUrls.length > 0) {
-                            setUploadedImageUrls(prev => [...prev, ...successfulUrls]);
-                            toast.success(`${successfulUrls.length} image(s) uploaded successfully`);
-                          } else {
+
+                    {/* Upload button */}
+                    <label className="flex flex-col items-center gap-2 cursor-pointer">
+                      {isUploading ? (
+                        <>
+                          <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
+                          <span className="text-sm text-gray-500">Uploading to Cloudinary...</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
+                            <ImageIcon className="h-6 w-6 text-gray-400" />
+                          </div>
+                          <span className="text-sm text-gray-500">
+                            {uploadedImageUrls.length > 0 ? 'Add more images' : 'Click to upload product images'}
+                          </span>
+                          <span className="text-xs text-gray-400">JPG, PNG, WEBP up to 10MB</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        disabled={isUploading}
+                        onChange={async (e) => {
+                          const files = Array.from(e.target.files || []);
+                          if (files.length === 0) return;
+
+                          setIsUploading(true);
+                          try {
+                            const uploadPromises = files.map(file => productsApi.uploadImage(file));
+                            const results = await Promise.all(uploadPromises);
+
+                            const successfulUrls = results
+                              .filter(result => result.success && result.data?.url)
+                              .map(result => result.data!.url);
+
+                            if (successfulUrls.length > 0) {
+                              setUploadedImageUrls(prev => [...prev, ...successfulUrls]);
+                              toast.success(`${successfulUrls.length} image(s) uploaded successfully`);
+                            } else {
+                              toast.error('Failed to upload images');
+                            }
+                          } catch {
                             toast.error('Failed to upload images');
+                          } finally {
+                            setIsUploading(false);
+                            e.target.value = ''; // Reset input
                           }
-                        } catch {
-                          toast.error('Failed to upload images');
-                        } finally {
-                          setIsUploading(false);
-                          e.target.value = ''; // Reset input
-                        }
-                      }}
-                    />
-                  </label>
+                        }}
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
-              <DialogFooter>
+              <DialogFooter className="pt-4 border-t mt-auto">
                 <Button
                   type="button"
                   variant="outline"
@@ -983,250 +1329,467 @@ export default function ProductsManagement() {
         }}
       >
 
-        <DialogContent>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Edit Product</DialogTitle>
             <DialogDescription>Update product details.</DialogDescription>
           </DialogHeader>
           <Form {...editForm}>
-            <form onSubmit={editForm.handleSubmit(handleUpdateProduct)} className="space-y-4">
-              <FormField
-                control={editForm.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Product Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter product name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={editForm.control}
-                name="categoryId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <Select
-                      onValueChange={async (val) => {
-                        field.onChange(val);
-                        editForm.setValue('subcategoryId', '');
-                        if (val) {
-                          setIsEditSubcategoriesLoading(true);
-                          try {
-                            const res = await subcategoriesApi.getByCategory(parseInt(val, 10));
-                            setEditSubcategories(res.success ? (res.data || []) : []);
-                          } catch { 
-                            setEditSubcategories([]); 
-                          } finally {
-                            setIsEditSubcategoriesLoading(false);
-                          }
-                        } else {
-                          setEditSubcategories([]);
-                        }
-                      }}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a category" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {categories
-                          .filter(cat => cat.status === 'active')
-                          .map((category) => (
-                            <SelectItem key={category.id} value={category.id.toString()}>
-                              {category.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {/* Subcategory dropdown */}
-              <FormField
-                control={editForm.control}
-                name="subcategoryId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Subcategory <span className="text-gray-400 font-normal">(optional)</span></FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      value={field.value || '__none__'} 
-                      disabled={isEditSubcategoriesLoading || (!!editForm.getValues('categoryId') && editSubcategories.length === 0)}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={isEditSubcategoriesLoading ? "Loading..." : (editForm.getValues('categoryId') && editSubcategories.length === 0 ? "No subcategories" : "Select subcategory (optional)")} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="__none__">— None —</SelectItem>
-                        {editSubcategories.map((sub) => (
-                          <SelectItem key={sub.id} value={sub.id.toString()}>
-                            {sub.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {!isSeller && (
+            <form onSubmit={editForm.handleSubmit(handleUpdateProduct)} className="flex-1 flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto pr-2 space-y-4">
                 <FormField
                   control={editForm.control}
-                  name="sellerId"
+                  name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Seller</FormLabel>
+                      <FormLabel>Product Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter product name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="categoryId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <div className="flex gap-2">
+                        <Select
+                          onValueChange={async (val) => {
+                            field.onChange(val);
+                            editForm.setValue('subcategoryId', '');
+                            if (val) {
+                              setIsEditSubcategoriesLoading(true);
+                              try {
+                                const res = await subcategoriesApi.getByCategory(parseInt(val, 10));
+                                setEditSubcategories(res.success ? (res.data || []) : []);
+                              } catch {
+                                setEditSubcategories([]);
+                              } finally {
+                                setIsEditSubcategoriesLoading(false);
+                              }
+                            } else {
+                              setEditSubcategories([]);
+                            }
+                          }}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {categories
+                              .filter(cat => cat.status === 'active')
+                              .map((category) => (
+                                <SelectItem key={category.id} value={category.id.toString()}>
+                                  {category.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {/* Subcategory dropdown */}
+                <FormField
+                  control={editForm.control}
+                  name="subcategoryId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Subcategory <span className="text-gray-400 font-normal">(optional)</span></FormLabel>
+                      <div className="flex gap-2">
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value || '__none__'}
+                          disabled={isEditSubcategoriesLoading || (!!editForm.getValues('categoryId') && editSubcategories.length === 0)}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="flex-1">
+                              <SelectValue placeholder={isEditSubcategoriesLoading ? "Loading..." : (editForm.getValues('categoryId') && editSubcategories.length === 0 ? "No subcategories" : "Select subcategory (optional)")} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="__none__">— None —</SelectItem>
+                            {editSubcategories.map((sub) => (
+                              <SelectItem key={sub.id} value={sub.id.toString()}>
+                                {sub.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setIsQuickAddSubcategoryOpen(true)}
+                          title="Add New Subcategory"
+                          disabled={!editForm.getValues('categoryId')}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {!isSeller && (
+                  <FormField
+                    control={editForm.control}
+                    name="sellerId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Seller</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a seller" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="__my__">My Products</SelectItem>
+                            {sellers
+                              .filter(seller => seller.status === 'active')
+                              .map((seller) => (
+                                <SelectItem key={seller.id} value={seller.id}>
+                                  {seller.businessName} ({seller.email})
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+                <FormField
+                  control={editForm.control}
+                  name="price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Price</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="0.00"
+                          step="0.01"
+                          min="0"
+                          {...field}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          value={field.value || 0}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="stock"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Stock</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select a seller" />
+                            <SelectValue placeholder="Select stock status" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="__my__">My Products</SelectItem>
-                          {sellers
-                            .filter(seller => seller.status === 'active')
-                            .map((seller) => (
-                              <SelectItem key={seller.id} value={seller.id}>
-                                {seller.businessName} ({seller.email})
-                              </SelectItem>
-                            ))}
+                          <SelectItem value="available">Available</SelectItem>
+                          <SelectItem value="unavailable">Unavailable</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              )}
-              <FormField
-                control={editForm.control}
-                name="price"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Price</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="0.00"
-                        step="0.01"
-                        min="0"
-                        {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                        value={field.value || 0}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={editForm.control}
-                name="stock"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Stock</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select stock status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="available">Available</SelectItem>
-                        <SelectItem value="unavailable">Unavailable</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {/* Image Uploader */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Product Image</label>
-                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4">
-                  {editUploadedImageUrls.length > 0 || editingProduct?.images?.[0] ? (
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={editUploadedImageUrls[0] || editingProduct?.images?.[0] || ''}
-                        alt="Product preview"
-                        className="h-20 w-20 rounded-lg object-cover border"
-                      />
-                      <div className="flex-1">
-                        <p className="text-sm text-green-600 font-medium">✓ {editUploadedImageUrls.length > 0 ? 'New image uploaded' : 'Current image'}</p>
-                        <p className="text-xs text-gray-500 truncate max-w-[200px]">{editUploadedImageUrls[0] || editingProduct?.images?.[0]}</p>
-                      </div>
-                      {editUploadedImageUrls.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setEditUploadedImageUrls([])}
-                          className="text-gray-400 hover:text-red-500 transition-colors"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      )}
+
+                {/* Product Options Section (Edit) */}
+                <div className="space-y-4 pt-4 border-t">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <FormLabel className="text-base font-semibold">Product Options</FormLabel>
+                      <p className="text-sm text-muted-foreground">Add options like Size, Color, etc. and their possible values.</p>
                     </div>
-                  ) : (
-                    <label className="flex flex-col items-center gap-2 cursor-pointer">
-                      {isEditUploading ? (
-                        <>
-                          <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
-                          <span className="text-sm text-gray-500">Uploading to Cloudinary...</span>
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
-                            <ImageIcon className="h-6 w-6 text-gray-400" />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => appendEditOption({ name: '', values: [] })}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Option
+                    </Button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {editOptionFields.map((field, index) => (
+                      <Card key={field.id} className="border-dashed">
+                        <CardContent className="p-4 space-y-4">
+                          <div className="flex items-start gap-4">
+                            <div className="flex-1 space-y-4">
+                              <FormField
+                                control={editForm.control}
+                                name={`options.${index}.name`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Option Name</FormLabel>
+                                    <FormControl>
+                                      <Input placeholder="e.g. Color" {...field} />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={editForm.control}
+                                name={`options.${index}.values`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Values (Comma-separated)</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder="e.g. Red, Blue, Green"
+                                        value={Array.isArray(field.value) ? field.value.join(', ') : ''}
+                                        onChange={(e) => {
+                                          const values = e.target.value.split(',').map(v => v.trim()).filter(Boolean);
+                                          field.onChange(values);
+                                        }}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive mt-8"
+                              onClick={() => removeEditOption(index)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
-                          <span className="text-sm text-gray-500">Click to upload product images</span>
-                          <span className="text-xs text-gray-400">JPG, PNG, WEBP up to 10MB</span>
-                        </>
-                      )}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        disabled={isEditUploading}
-                        onChange={async (e) => {
-                          const files = Array.from(e.target.files || []);
-                          if (files.length === 0) return;
-                          setIsEditUploading(true);
-                          try {
-                            const uploadPromises = files.map(file => productsApi.uploadImage(file));
-                            const results = await Promise.all(uploadPromises);
-                            
-                            const successfulUrls = results
-                              .filter(result => result.success && result.data?.url)
-                              .map(result => result.data!.url);
-                            
-                            if (successfulUrls.length > 0) {
-                              setEditUploadedImageUrls(prev => [...prev, ...successfulUrls]);
-                              toast.success(`${successfulUrls.length} image(s) uploaded successfully`);
-                            } else {
-                              toast.error('Failed to upload images');
-                            }
-                          } catch {
-                            toast.error('Failed to upload images');
-                          } finally {
-                            setIsEditUploading(false);
-                            e.target.value = '';
-                          }
-                        }}
-                      />
-                    </label>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+
+                  {editOptionFields.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="w-full"
+                      onClick={() => {
+                        const options = editForm.getValues('options') || [];
+                        const generated = generateVariants(options);
+                        replaceEditVariants(generated);
+                      }}
+                    >
+                      Generate Variants
+                    </Button>
                   )}
                 </div>
+
+                {/* Generated Variants Section (Edit) */}
+                {editVariantFields.length > 0 && (
+                  <div className="space-y-4 pt-4 border-t">
+                    <FormLabel className="text-base font-semibold">Generated Variants</FormLabel>
+                    <div className="space-y-2">
+                      {editVariantFields.map((field, index) => (
+                        <Card key={field.id} className="border">
+                          <CardContent className="p-4 space-y-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-medium text-sm bg-muted px-2 py-1 rounded">
+                                {Object.entries(field.optionValueNames || {})
+                                  .map(([key, val]) => `${key}: ${val}`)
+                                  .join(' / ')}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive h-8 p-0"
+                                onClick={() => removeEditVariant(index)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <FormField
+                                control={editForm.control}
+                                name={`variants.${index}.price`}
+                                render={({ field: { onChange, ...field } }) => (
+                                  <FormItem>
+                                    <FormLabel>Price (INR) *</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="number"
+                                        placeholder="e.g. 999"
+                                        {...field}
+                                        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={editForm.control}
+                                name={`variants.${index}.comparePrice`}
+                                render={({ field: { onChange, ...field } }) => (
+                                  <FormItem>
+                                    <FormLabel>Compare Price (INR)</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="number"
+                                        placeholder="e.g. 1499 (original)"
+                                        {...field}
+                                        value={field.value ?? ''}
+                                        onChange={(e) => onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={editForm.control}
+                                name={`variants.${index}.stock`}
+                                render={({ field: { onChange, ...field } }) => (
+                                  <FormItem>
+                                    <FormLabel>Stock Qty *</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="number"
+                                        placeholder="0"
+                                        {...field}
+                                        onChange={(e) => onChange(parseInt(e.target.value, 10) || 0)}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                              {/* Image selector for this variant */}
+                              <FormItem>
+                                <FormLabel>Variant Image</FormLabel>
+                                <select
+                                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                  value={(editForm.watch(`variants.${index}.images`) as string[] | undefined)?.[0] || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    editForm.setValue(`variants.${index}.images`, val ? [val] : []);
+                                  }}
+                                >
+                                  <option value="">— None —</option>
+                                  {/* show newly uploaded images first, then existing product images */}
+                                  {[...editUploadedImageUrls, ...(editingProduct?.images || [])].filter((u, i, arr) => arr.indexOf(u) === i).map((url, i) => (
+                                    <option key={i} value={url}>
+                                      Image {i + 1}
+                                    </option>
+                                  ))}
+                                </select>
+                                {/* Preview */}
+                                {((editForm.watch(`variants.${index}.images`) as string[] | undefined)?.[0]) && (
+                                  <img
+                                    src={(editForm.watch(`variants.${index}.images`) as string[])[0]}
+                                    alt="variant"
+                                    className="mt-2 h-16 w-16 rounded object-cover border"
+                                  />
+                                )}
+                              </FormItem>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Image Uploader */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Product Image</label>
+                  <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                    {editUploadedImageUrls.length > 0 || editingProduct?.images?.[0] ? (
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={editUploadedImageUrls[0] || editingProduct?.images?.[0] || ''}
+                          alt="Product preview"
+                          className="h-20 w-20 rounded-lg object-cover border"
+                        />
+                        <div className="flex-1">
+                          <p className="text-sm text-green-600 font-medium">✓ {editUploadedImageUrls.length > 0 ? 'New image uploaded' : 'Current image'}</p>
+                          <p className="text-xs text-gray-500 truncate max-w-[200px]">{editUploadedImageUrls[0] || editingProduct?.images?.[0]}</p>
+                        </div>
+                        {editUploadedImageUrls.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setEditUploadedImageUrls([])}
+                            className="text-gray-400 hover:text-red-500 transition-colors"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center gap-2 cursor-pointer">
+                        {isEditUploading ? (
+                          <>
+                            <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
+                            <span className="text-sm text-gray-500">Uploading to Cloudinary...</span>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
+                              <ImageIcon className="h-6 w-6 text-gray-400" />
+                            </div>
+                            <span className="text-sm text-gray-500">Click to upload product images</span>
+                            <span className="text-xs text-gray-400">JPG, PNG, WEBP up to 10MB</span>
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          disabled={isEditUploading}
+                          onChange={async (e) => {
+                            const files = Array.from(e.target.files || []);
+                            if (files.length === 0) return;
+                            setIsEditUploading(true);
+                            try {
+                              const uploadPromises = files.map(file => productsApi.uploadImage(file));
+                              const results = await Promise.all(uploadPromises);
+
+                              const successfulUrls = results
+                                .filter(result => result.success && result.data?.url)
+                                .map(result => result.data!.url);
+
+                              if (successfulUrls.length > 0) {
+                                setEditUploadedImageUrls(prev => [...prev, ...successfulUrls]);
+                                toast.success(`${successfulUrls.length} image(s) uploaded successfully`);
+                              } else {
+                                toast.error('Failed to upload images');
+                              }
+                            } catch {
+                              toast.error('Failed to upload images');
+                            } finally {
+                              setIsEditUploading(false);
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
               </div>
-              <DialogFooter>
+              <DialogFooter className="pt-4 border-t mt-auto">
 
                 <Button
                   type="button"
@@ -1367,6 +1930,37 @@ export default function ProductsManagement() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Add Subcategory Dialog */}
+      <Dialog open={isQuickAddSubcategoryOpen} onOpenChange={setIsQuickAddSubcategoryOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Quick Add Subcategory</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Subcategory Name</label>
+              <Input
+                value={quickAddName}
+                onChange={(e) => setQuickAddName(e.target.value)}
+                placeholder="Enter subcategory name"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Description (Optional)</label>
+              <Input
+                value={quickAddDesc}
+                onChange={(e) => setQuickAddDesc(e.target.value)}
+                placeholder="Enter description"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsQuickAddSubcategoryOpen(false)}>Cancel</Button>
+            <Button onClick={handleQuickCreateSubcategory} disabled={isLoading || !quickAddName}>Create</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

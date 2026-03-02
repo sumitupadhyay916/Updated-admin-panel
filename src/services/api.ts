@@ -400,11 +400,11 @@ export interface UpdateProductRequest {
 
 
 export const productsApi = {
-  getProducts: async (params?: PaginationParams & { 
-    deity?: string; 
-    material?: string; 
-    minPrice?: number; 
-    maxPrice?: number; 
+  getProducts: async (params?: PaginationParams & {
+    deity?: string;
+    material?: string;
+    minPrice?: number;
+    maxPrice?: number;
     status?: string;
     sellerId?: string;
     isFeatured?: boolean;
@@ -501,8 +501,8 @@ export interface UpdateOrderStatusRequest {
 }
 
 export const ordersApi = {
-  getOrders: async (params?: PaginationParams & { 
-    status?: string; 
+  getOrders: async (params?: PaginationParams & {
+    status?: string;
     paymentStatus?: string;
     sellerId?: string;
     customerId?: string;
