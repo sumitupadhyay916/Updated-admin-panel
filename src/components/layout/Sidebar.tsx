@@ -187,13 +187,6 @@ const sellerNavItems: NavItem[] = [
     label: 'Inventory',
     href: '/seller/inventory',
     icon: Warehouse,
-    roles: ['seller', 'staff'],
-    permissions: ['manage_inventory'],
-  },
-  {
-    label: 'Inventory',
-    href: '/seller/inventory',
-    icon: Warehouse,
     roles: ['seller'],
   },
   {

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { User, UserRole, LoginCredentials, SuperAdmin, Admin } from '@/types';
+// UserRole is probably missing 'staff', but this is just an example of modifying imports if needed.
+import type { User, UserRole as BaseUserRole, LoginCredentials, SuperAdmin, Admin } from '@/types';
+type UserRole = BaseUserRole | 'staff';
 import { authApi } from '@/services/api';
 
 interface AuthState {
@@ -60,7 +62,9 @@ export const useAuthStore = create<AuthState>()(
 
             // Check if role matches (if specified)
             if (credentials.role) {
-              if (credentials.role === 'seller' && user.role === 'staff') {
+              if (credentials.role === 'staff' && user.role === 'staff') {
+                // Allow staff directly 
+              } else if (credentials.role === 'seller' && user.role === 'staff') {
                 // Allow staff to login via the seller portal
               } else if (user.role !== credentials.role) {
                 set({ isLoading: false });

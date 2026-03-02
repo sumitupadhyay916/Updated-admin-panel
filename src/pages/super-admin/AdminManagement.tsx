@@ -274,7 +274,7 @@ export default function AdminManagement() {
 
   const columns: ColumnDef<Admin>[] = useMemo(() => [
     {
-      accessorKey: 'admin',
+      accessorKey: 'name',
       header: 'Admin',
       cell: ({ row }: { row: { original: Admin } }) => {
         const admin = row.original;

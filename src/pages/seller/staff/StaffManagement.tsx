@@ -10,6 +10,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
@@ -50,8 +51,7 @@ export default function StaffManagement() {
       if (res.success) {
         setStaff(res.data as any[]);
       }
-    } catch (error) {
-      console.error('Fetch staff error:', error);
+    } catch (error: any) {
       toast.error('Failed to load staff list');
     } finally {
       setIsLoading(false);
@@ -115,9 +115,10 @@ export default function StaffManagement() {
       } else {
         toast.error(res.message || 'Error saving staff');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Save staff error:', error);
-      toast.error('Failed to save staff');
+      const errorMsg = error.response?.data?.message || 'Failed to save staff';
+      toast.error(errorMsg);
     }
   };
 
@@ -262,6 +263,9 @@ export default function StaffManagement() {
         <DialogContent className="sm:max-w-[600px] h-[90vh] sm:h-auto overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingStaff ? 'Edit Staff Member' : 'Add New Staff Member'}</DialogTitle>
+            <DialogDescription className="sr-only">
+              Add or edit details for a staff member, including permissions.
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-6 mt-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

@@ -16,9 +16,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Eye, EyeOff, Loader2, Moon, Sun, Sparkles } from 'lucide-react';
-import type { UserRole } from '@/types';
+// import type { UserRole } from '@/types';
 
-const roleOptions: { value: UserRole; label: string }[] = [
+const roleOptions: { value: string; label: string }[] = [
   { value: 'super_admin', label: 'Super Admin' },
   { value: 'admin', label: 'Admin' },
   { value: 'seller', label: 'Seller' },
@@ -37,14 +37,19 @@ export default function Login() {
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('super_admin');
+  const [role, setRole] = useState<string>('super_admin');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
-  const handleRoleChange = (value: UserRole) => {
+  const handleRoleChange = (value: string) => {
     setRole(value);
-    setEmail(mockCredentials[value].email);
-    setPassword(mockCredentials[value].password);
+    if (value === 'staff') {
+      setEmail('');
+      setPassword('');
+    } else {
+      setEmail(mockCredentials[value].email);
+      setPassword(mockCredentials[value].password);
+    }
     setError('');
   };
 
@@ -52,7 +57,7 @@ export default function Login() {
     e.preventDefault();
     setError('');
 
-    const success = await login({ email, password, role });
+    const success = await login({ email, password, role: role as any });
     
     if (success) {
       // Redirect based on role

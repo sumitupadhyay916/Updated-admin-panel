@@ -26,6 +26,7 @@ import CreateCoupon from '@/pages/seller/Coupons/CreateCoupon';
 import AbandonedCarts from '@/pages/seller/AbandonedCarts';
 import SellerSupportPages from '@/pages/seller/SellerSupportPages';
 import SellerInventory from '@/pages/seller/Inventory';
+import StaffManagement from '@/pages/seller/staff/StaffManagement';
 
 // Protected Route Component
 function ProtectedRoute({ 
@@ -151,7 +152,7 @@ function App() {
           <Route path="/seller/coupons" element={<ListCoupon />} />
           <Route path="/seller/coupons/create" element={<CreateCoupon />} />
           <Route path="/seller/abandoned-carts" element={<AbandonedCarts />} />
-          {/* <Route path="/seller/staff" element={<StaffManagement />} /> */}
+          <Route path="/seller/staff" element={<StaffManagement />} />
           <Route path="/seller/support-pages" element={<SellerSupportPages />} />
           <Route path="/seller/support-pages/:slug" element={<SellerSupportPages />} />
           {/* Settings routes — sidebar Settings parent highlights for /seller/settings/* */}

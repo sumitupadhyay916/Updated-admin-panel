@@ -700,7 +700,7 @@ export default function ProductsManagement() {
         }}
       >
 
-        <DialogContent>
+         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create Product</DialogTitle>
             <DialogDescription>Add a new product to the marketplace.</DialogDescription>
@@ -1302,7 +1302,7 @@ export default function ProductsManagement() {
           setDeletingProduct(null);
         }
       }}>
-        <DialogContent>
+         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Product</DialogTitle>
             <DialogDescription>
