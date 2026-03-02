@@ -4,12 +4,6 @@ import type {
   InternalAxiosRequestConfig,
   AxiosError,
 } from "axios";
-import type { User, UserRole, SuperAdmin } from "@/types";
-import { mockAdmins, mockSellers } from "@/services/mockData";
-
-// Toggle this flag via env to switch between mock auth and real backend auth
-// Defaults to real backend when not explicitly set
-const USE_MOCK_AUTH = import.meta.env.VITE_USE_MOCK_AUTH === "true";
 
 // API base URL
 const API_BASE_URL =
@@ -27,7 +21,7 @@ const apiClient: AxiosInstance = axios.create({
 // Request interceptor - add auth token
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -42,8 +36,8 @@ apiClient.interceptors.response.use(
   (error: AxiosError) => {
     if (error.response?.status === 401) {
       // Token expired or invalid - logout user
-      localStorage.removeItem("token");
-      localStorage.removeItem("auth-storage");
+      sessionStorage.removeItem("token");
+      sessionStorage.removeItem("auth-storage");
       window.location.href = "/login";
     }
     return Promise.reject(error);
@@ -98,91 +92,11 @@ export interface ChangePasswordRequest {
   newPassword: string;
 }
 
-// ============================================
-// MOCK AUTH IMPLEMENTATION
-// ============================================
-
-const mockSuperAdmin: SuperAdmin = {
-  id: "sa-001",
-  email: "super@divine.com",
-  name: "Super Admin",
-  role: "super_admin",
-  avatar:
-    "https://api.dicebear.com/7.x/avataaars/svg?seed=super-admin",
-  phone: "+91-9876543210",
-  status: "active",
-  createdAt: "2024-01-01",
-  updatedAt: "2024-01-01",
-  permissions: [
-    "manage_sellers",
-    "manage_products",
-    "manage_orders",
-    "view_reports",
-    "all",
-  ],
-};
-
-type MockAuthUser = {
-  email: string;
-  password: string;
-  role: UserRole;
-  user: User;
-};
-
-const mockAuthUsers: MockAuthUser[] = [
-  {
-    email: "super@divine.com",
-    password: "admin123",
-    role: "super_admin",
-    user: mockSuperAdmin,
-  },
-  {
-    email: "admin@divine.com",
-    password: "admin123",
-    role: "admin",
-    user: mockAdmins[0] as User,
-  },
-  {
-    email: "seller@divine.com",
-    password: "seller123",
-    role: "seller",
-    user: mockSellers[0] as User,
-  },
-];
-
 export const authApi = {
   login: async (data: LoginRequest): Promise<ApiResponse<{ user: unknown; token: string }>> => {
-    if (USE_MOCK_AUTH) {
-      const match = mockAuthUsers.find(
-        (u) =>
-          u.email === data.email &&
-          u.password === data.password &&
-          (!data.role || u.role === data.role),
-      );
-
-      if (!match) {
-        return {
-          success: false,
-          message: "Invalid credentials",
-        };
-      }
-
-      const token = `mock-token-${match.user.id}`;
-      localStorage.setItem("token", token);
-
-      return {
-        success: true,
-        message: "Login successful",
-        data: {
-          user: match.user,
-          token,
-        },
-      };
-    }
-
     const response = await apiClient.post("/auth/login", data);
     if (response.data.success && response.data.data?.token) {
-      localStorage.setItem("token", response.data.data.token);
+      sessionStorage.setItem("token", response.data.data.token);
     }
     return response.data;
   },
@@ -190,7 +104,7 @@ export const authApi = {
   register: async (data: RegisterRequest): Promise<ApiResponse<{ user: unknown; token: string }>> => {
     const response = await apiClient.post('/auth/register', data);
     if (response.data.success && response.data.data?.token) {
-      localStorage.setItem('token', response.data.data.token);
+      sessionStorage.setItem('token', response.data.data.token);
     }
     return response.data;
   },
@@ -206,8 +120,8 @@ export const authApi = {
   },
 
   logout: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('auth-storage');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('auth-storage');
   },
 };
 
@@ -469,6 +383,49 @@ export const productsApi = {
     const response = await apiClient.post('/products/upload-image', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
+    return response.data;
+  },
+
+  // Inventory management endpoints
+  getInventoryStats: async (): Promise<ApiResponse<{
+    totalProducts: number;
+    totalStockQuantity: number;
+    deliveredQuantity: number;
+    reservedQuantity: number;
+    shippingQuantity: number;
+    lowStockProducts: number;
+  }>> => {
+    const response = await apiClient.get('/products/inventory/stats');
+    return response.data;
+  },
+
+  getCartDetails: async (): Promise<ApiResponse<Array<{
+    productId: number;
+    productPid: string;
+    productName: string;
+    productImage: string | null;
+    productPrice: number;
+    reservedQuantity: number;
+    numberOfCarts: number;
+    carts: Array<{
+      cartId: string;
+      userId: string;
+      quantity: number;
+      addedAt: string;
+      updatedAt: string;
+    }>;
+  }>>> => {
+    const response = await apiClient.get('/products/inventory/cart-details');
+    return response.data;
+  },
+
+  getProductInventoryDetails: async (id: string | number): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.get(`/products/${id}/inventory-details`);
+    return response.data;
+  },
+
+  adjustProductStock: async (id: string | number, adjustment: number): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.post(`/products/${id}/adjust-stock`, { adjustment });
     return response.data;
   },
 };
@@ -1042,6 +999,28 @@ export const subcategoriesApi = {
     const response = await apiClient.delete(`/subcategories/${id}`);
     return response.data;
   },
+};
+
+export const staffApi = {
+  getStaff: async (): Promise<ApiResponse<unknown[]>> => {
+    const response = await apiClient.get('/staff');
+    return response.data;
+  },
+  
+  createStaff: async (data: any): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.post('/staff', data);
+    return response.data;
+  },
+  
+  updateStaff: async (id: string, data: any): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.put(`/staff/${id}`, data);
+    return response.data;
+  },
+  
+  deleteStaff: async (id: string): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete(`/staff/${id}`);
+    return response.data;
+  }
 };
 
 export default apiClient;

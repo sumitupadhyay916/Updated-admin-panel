@@ -147,15 +147,15 @@ export default function OrdersManagement() {
       header: 'Status',
       cell: ({ row }: { row: { original: Order } }) => <StatusBadge status={row.original.orderStatus} />,
     },
-    {
-      accessorKey: 'fulfillmentStatus',
-      header: 'Fulfillment',
-      cell: ({ row }: { row: { original: Order } }) => (
-        <div className="flex items-center gap-2">
-          <StatusBadge status={row.original.fulfillmentStatus} />
-        </div>
-      ),
-    },
+    // {
+    //   accessorKey: 'fulfillmentStatus',
+    //   header: 'Fulfillment',
+    //   cell: ({ row }: { row: { original: Order } }) => (
+    //     <div className="flex items-center gap-2">
+    //       <StatusBadge status={row.original.fulfillmentStatus} />
+    //     </div>
+    //   ),
+    // },
     {
       id: 'actions',
       cell: ({ row }: { row: { original: Order } }) => {

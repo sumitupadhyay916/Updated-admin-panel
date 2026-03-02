@@ -25,6 +25,8 @@ import ListCoupon from '@/pages/seller/Coupons/ListCoupon';
 import CreateCoupon from '@/pages/seller/Coupons/CreateCoupon';
 import AbandonedCarts from '@/pages/seller/AbandonedCarts';
 import SellerSupportPages from '@/pages/seller/SellerSupportPages';
+import SellerInventory from '@/pages/seller/Inventory';
+import StaffManagement from '@/pages/seller/staff/StaffManagement';
 
 // Protected Route Component
 function ProtectedRoute({ 
@@ -48,6 +50,7 @@ function ProtectedRoute({
       case 'admin':
         return <Navigate to="/admin" replace />;
       case 'seller':
+      case 'staff':
         return <Navigate to="/seller" replace />;
       default:
         return <Navigate to="/login" replace />;
@@ -68,6 +71,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
       case 'admin':
         return <Navigate to="/admin" replace />;
       case 'seller':
+      case 'staff':
         return <Navigate to="/seller" replace />;
       default:
         return <Navigate to="/login" replace />;
@@ -132,21 +136,23 @@ function App() {
           <Route path="/admin/support-pages/:slug" element={<SupportPages />} />
         </Route>
 
-        {/* Seller Routes */}
+        {/* Seller & Staff Routes */}
         <Route 
           element={
-            <ProtectedRoute allowedRoles={['super_admin', 'admin', 'seller']}>
+            <ProtectedRoute allowedRoles={['super_admin', 'admin', 'seller', 'staff']}>
               <Layout />
             </ProtectedRoute>
           }
         >
           <Route path="/seller" element={<SellerDashboard />} />
+          <Route path="/seller/inventory" element={<SellerInventory />} />
           <Route path="/seller/products" element={<ProductsManagement />} />
           <Route path="/seller/orders" element={<OrdersManagement />} />
           <Route path="/seller/payouts" element={<PayoutsManagement />} />
           <Route path="/seller/coupons" element={<ListCoupon />} />
           <Route path="/seller/coupons/create" element={<CreateCoupon />} />
           <Route path="/seller/abandoned-carts" element={<AbandonedCarts />} />
+          <Route path="/seller/staff" element={<StaffManagement />} />
           <Route path="/seller/support-pages" element={<SellerSupportPages />} />
           <Route path="/seller/support-pages/:slug" element={<SellerSupportPages />} />
           {/* Settings routes — sidebar Settings parent highlights for /seller/settings/* */}

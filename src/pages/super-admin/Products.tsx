@@ -29,6 +29,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form';
 import {
   Select,
@@ -69,6 +70,7 @@ const productFormSchemaWithSeller = z.object({
     name: z.string().min(1, 'Option name is required'),
     values: z.array(z.string().min(1, 'Option value is required')),
   })).optional(),
+  stockQuantity: z.number().min(0, 'Stock quantity must be 0 or greater').default(0),
 });
 
 // Schema for seller (sellerId not required, will be auto-set)
@@ -87,6 +89,7 @@ const productFormSchemaWithoutSeller = z.object({
     stock: z.number().min(0, 'Variant stock cannot be negative'),
     imageUrl: z.string().optional(),
   })).optional(),
+  stockQuantity: z.number().min(0, 'Stock quantity must be 0 or greater').default(0),
 });
 
 type ProductFormValues = z.infer<typeof productFormSchemaWithSeller>;
@@ -136,6 +139,7 @@ export default function ProductsManagement() {
       stock: 'available',
       options: [],
       variants: [],
+      stockQuantity: 0,
     },
   });
 
@@ -150,6 +154,7 @@ export default function ProductsManagement() {
       stock: 'available',
       options: [],
       variants: [],
+      stockQuantity: 0,
     },
   });
 
@@ -282,6 +287,7 @@ export default function ProductsManagement() {
         price: values.price,
         stock: values.stock,
         variants: values.variants,
+        stockQuantity: values.stockQuantity || 0,
       };
       if (values.subcategoryId && values.subcategoryId !== '__none__') {
         payload.subcategoryId = parseInt(values.subcategoryId, 10);
@@ -314,6 +320,7 @@ export default function ProductsManagement() {
           sellerId: isSeller ? '' : '__my__',
           price: 0,
           stock: 'available',
+          stockQuantity: 0,
         });
         setSubcategories([]);
 
@@ -427,6 +434,7 @@ export default function ProductsManagement() {
           sellerId: '',
           price: 0,
           stock: 'available',
+          stockQuantity: 0,
         });
         setEditSubcategories([]);
         await loadProducts();
@@ -566,11 +574,13 @@ export default function ProductsManagement() {
                 <img
                   src={product.images[0]}
                   alt={product.name}
-                  className="h-12 w-12 rounded-lg object-cover"
+                  className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
                 />
               )}
-              <div>
-                <p className="font-medium text-gray-900 dark:text-white">{product.name}</p>
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-gray-900 dark:text-white truncate max-w-[200px]" title={product.name}>
+                  {product.name}
+                </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">{product.sellerName}</p>
               </div>
             </div>
@@ -813,13 +823,14 @@ export default function ProductsManagement() {
               sellerId: isSeller ? '' : '__my__',
               price: 0,
               stock: 'available',
+              stockQuantity: 0,
             });
             setSubcategories([]);
           }
         }}
       >
 
-        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create Product</DialogTitle>
             <DialogDescription>Add a new product to the marketplace.</DialogDescription>
@@ -1291,9 +1302,11 @@ export default function ProductsManagement() {
                     form.reset({
                       name: '',
                       categoryId: '',
+                      subcategoryId: '',
                       sellerId: '',
                       price: 0,
                       stock: 'available',
+                      stockQuantity: 0,
                     });
                   }}
                   disabled={isLoading}
@@ -1324,6 +1337,7 @@ export default function ProductsManagement() {
               sellerId: isSeller ? '' : '__my__',
               price: 0,
               stock: 'available',
+              stockQuantity: 0,
             });
           }
         }}
@@ -1800,9 +1814,11 @@ export default function ProductsManagement() {
                     editForm.reset({
                       name: '',
                       categoryId: '',
+                      subcategoryId: '',
                       sellerId: '',
                       price: 0,
                       stock: 'available',
+                      stockQuantity: 0,
                     });
                   }}
                   disabled={isLoading}
