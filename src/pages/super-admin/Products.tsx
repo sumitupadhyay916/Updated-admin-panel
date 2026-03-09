@@ -353,6 +353,7 @@ export default function ProductsManagement() {
       sellerId: !isSeller && user?.id && product.sellerId === user.id ? '__my__' : (product.sellerId || ''),
       price: product.price,
       stock: product.stock,
+      stockQuantity: product.stockQuantity,
       variants: (product as any).variants || [],
     });
 
@@ -402,6 +403,7 @@ export default function ProductsManagement() {
         categoryId: parseInt(values.categoryId, 10),
         price: values.price,
         stock: values.stock,
+        stockQuantity: values.stockQuantity,
         variants: values.variants,
         subcategoryId: values.subcategoryId && values.subcategoryId !== '__none__'
           ? parseInt(values.subcategoryId, 10)
@@ -1011,6 +1013,30 @@ export default function ProductsManagement() {
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="stockQuantity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Initial Stock Quantity</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          min="0"
+                          step="1"
+                          {...field}
+                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                          value={field.value || 0}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Set the initial stock quantity for this product
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 {/* Product Options Section */}
                 <div className="space-y-4 pt-4 border-t">
@@ -1521,6 +1547,30 @@ export default function ProductsManagement() {
                           <SelectItem value="unavailable">Unavailable</SelectItem>
                         </SelectContent>
                       </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="stockQuantity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Stock Quantity</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          min="0"
+                          step="1"
+                          {...field}
+                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                          value={field.value || 0}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Update the stock quantity for this product
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

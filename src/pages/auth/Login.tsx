@@ -192,12 +192,12 @@ export default function Login() {
             </button>
           </div>
           
-          <div className="text-center text-xs text-gray-500 dark:text-gray-400">
+          {/* <div className="text-center text-xs text-gray-500 dark:text-gray-400">
             <p>Default Credentials (auto-filled):</p>
             <p className="mt-1 font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
               {mockCredentials[role].email} / {mockCredentials[role].password}
             </p>
-          </div>
+          </div> */}
         </CardFooter>
       </Card>
     </div>

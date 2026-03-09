@@ -117,13 +117,11 @@ export default function AdminDashboard() {
         <StatCard
           title="Total Revenue"
           value={stats ? formatCurrency(stats.totalRevenue) : '0'}
-          change={stats?.revenueChange}
           icon={DollarSign}
         />
         <StatCard
           title="Total Orders"
           value={stats?.totalOrders.toLocaleString() || '0'}
-          change={stats?.ordersChange}
           icon={ShoppingBag}
         />
         <StatCard
