@@ -89,10 +89,6 @@ export function ViewProductModal({ product, open, onClose }: ViewProductModalPro
               <p className="text-lg font-semibold">{product.name}</p>
             </div>
 
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">Product ID</h3>
-              <p className="text-sm font-mono">{product.pid}</p>
-            </div>
 
             <div>
               <h3 className="text-sm font-medium text-muted-foreground mb-1">Category</h3>

@@ -559,13 +559,6 @@ export default function ProductsManagement() {
         ),
       },
       {
-        accessorKey: 'pid',
-        header: 'PID',
-        cell: ({ row }: { row: { original: Product } }) => (
-          <div className="font-mono text-xs text-muted-foreground">{row.original.pid}</div>
-        ),
-      },
-      {
         accessorKey: 'name',
         header: 'Products',
         cell: ({ row }: { row: { original: Product } }) => {
@@ -1116,7 +1109,7 @@ export default function ProductsManagement() {
                       className="w-full"
                       onClick={() => {
                         const options = form.getValues('options');
-                        const generated = generateVariants(options);
+                        const generated = generateVariants(options || []);
                         replaceVariants(generated);
                       }}
                     >

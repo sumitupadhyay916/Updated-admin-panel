@@ -158,19 +158,23 @@ const adminNavItems: NavItem[] = [
     href: '/admin/coupons',
     icon: Ticket,
     roles: ['admin'],
-  },
-  {
-    label: 'Settings',
-    href: '/admin/settings',
-    icon: Settings,
-    roles: ['admin'],
     children: [
-
-      { label: 'FAQs', href: '/admin/support-pages/faqs', icon: HelpCircle, roles: ['admin'] },
-      { label: 'Privacy Policy', href: '/admin/support-pages/privacy-policy', icon: Shield, roles: ['admin'] },
-      { label: 'Terms & Conditions', href: '/admin/support-pages/terms-conditions', icon: FileText, roles: ['admin'] },
+      { label: 'List Coupon', href: '/admin/coupons', icon: Ticket, roles: ['admin'] },
+      { label: 'Create Coupon', href: '/admin/coupons/create', icon: ShoppingCart, roles: ['admin'] },
     ],
   },
+  // {
+  //   label: 'Settings',
+  //   href: '/admin/settings',
+  //   icon: Settings,
+  //   roles: ['admin'],
+  //   children: [
+
+  //     { label: 'FAQs', href: '/admin/support-pages/faqs', icon: HelpCircle, roles: ['admin'] },
+  //     { label: 'Privacy Policy', href: '/admin/support-pages/privacy-policy', icon: Shield, roles: ['admin'] },
+  //     { label: 'Terms & Conditions', href: '/admin/support-pages/terms-conditions', icon: FileText, roles: ['admin'] },
+  //   ],
+  // },
 ];
 
 // Seller Navigation
@@ -187,7 +191,8 @@ const sellerNavItems: NavItem[] = [
     label: 'Inventory',
     href: '/seller/inventory',
     icon: Warehouse,
-    roles: ['seller'],
+    roles: ['seller', 'staff'],
+    permissions: ['manage_inventory'],
   },
   {
     label: 'My Orders',
@@ -214,7 +219,8 @@ const sellerNavItems: NavItem[] = [
     label: 'My Payouts',
     href: '/seller/payouts',
     icon: Wallet,
-    roles: ['seller'],
+    roles: ['seller', 'staff'],
+    permissions: ['manage_payouts'],
   },
   {
     label: 'Coupons',
