@@ -112,9 +112,11 @@ export interface Product {
   price: number;
   comparePrice?: number;
   stock: 'available' | 'unavailable';
+  stockQuantity: number;
   lowStockThreshold: number;
   images: string[];
   reviewCount: number;
+  averageRating: number;
   sellerId: string;
   sellerName: string;
   categoryId: number;
@@ -123,8 +125,37 @@ export interface Product {
   subcategorySlug: string | null;
   isFeatured: boolean;
   tags: string[];
+  options: ProductOption[];
+  variants: ProductVariant[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProductOption {
+  id: string;
+  name: string;
+  values: ProductOptionValue[];
+}
+
+export interface ProductOptionValue {
+  id: string;
+  value: string;
+}
+
+export interface ProductVariant {
+  id: string;
+  price: number;
+  comparePrice?: number;
+  stock: number;
+  images: string[];
+  optionValues: VariantOptionValueMapping[];
+}
+
+export interface VariantOptionValueMapping {
+  optionId: string;
+  optionName: string;
+  valueId: string;
+  value: string;
 }
 
 // ============================================
@@ -372,9 +403,7 @@ export interface DashboardStats {
   lowStockProducts: number;
   pendingPayouts: number;
   openQueries: number;
-  revenueChange: number;
-  ordersChange: number;
-  customersChange: number;
+  totalCategories: number;
 }
 
 export interface ChartData {

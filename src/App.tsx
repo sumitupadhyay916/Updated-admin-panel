@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { Layout, AuthLayout } from '@/components/layout/Layout';
@@ -82,6 +83,26 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  const { isAuthenticated, fetchProfile } = useAuthStore();
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+
+    if (isAuthenticated) {
+      // Call immediately on mount/refresh to ensure latest permissions
+      fetchProfile();
+
+      // Poll profile every 30 seconds to update permissions if seller changed them
+      interval = setInterval(() => {
+        fetchProfile();
+      }, 30000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isAuthenticated, fetchProfile]);
+
   return (
     <BrowserRouter>
       <Routes>

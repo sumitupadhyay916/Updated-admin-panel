@@ -100,12 +100,12 @@ const superAdminNavItems: NavItem[] = [
   //   icon: Ticket,
   //   roles: ['super_admin'],
   // },
-  {
-    label: 'Contact Queries',
-    href: '/super-admin/queries',
-    icon: MessageSquare,
-    roles: ['super_admin'],
-  },
+  // {
+  //   label: 'Contact Queries',
+  //   href: '/super-admin/queries',
+  //   icon: MessageSquare,
+  //   roles: ['super_admin'],
+  // },
 ];
 
 // Admin Navigation
