@@ -29,6 +29,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form';
 import {
   Select,
@@ -81,12 +82,15 @@ const productFormSchemaWithoutSeller = z.object({
   price: z.number().min(0.01, 'Price must be greater than 0'),
   stock: z.enum(['available', 'unavailable']),
   variants: z.array(z.object({
-    color: z.string().optional(),
-    size: z.string().optional(),
     price: z.number().min(0, 'Variant price cannot be negative'),
-    comparePrice: z.number().optional(),
+    comparePrice: z.number().optional().nullable(),
     stock: z.number().min(0, 'Variant stock cannot be negative'),
-    imageUrl: z.string().optional(),
+    images: z.array(z.string()).optional(),
+    optionValueNames: z.record(z.string(), z.string()),
+  })).optional(),
+  options: z.array(z.object({
+    name: z.string().min(1, 'Option name is required'),
+    values: z.array(z.string().min(1, 'Option value is required')),
   })).optional(),
   stockQuantity: z.number().min(0, 'Stock quantity must be 0 or greater').default(0),
 });
@@ -1045,15 +1049,43 @@ export default function ProductsManagement() {
                       <FormLabel className="text-base font-semibold">Product Options</FormLabel>
                       <p className="text-sm text-muted-foreground">Add options like Size, Color, etc. and their possible values.</p>
                     </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => appendOption({ name: '', values: [] })}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Option
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (!form.getValues('options')?.some(o => o.name.toLowerCase() === 'size')) {
+                            appendOption({ name: 'Size', values: [] });
+                          }
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Size
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (!form.getValues('options')?.some(o => o.name.toLowerCase() === 'color')) {
+                            appendOption({ name: 'Color', values: [] });
+                          }
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Color
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => appendOption({ name: '', values: [] })}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Custom Option
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="space-y-4">
@@ -1583,15 +1615,43 @@ export default function ProductsManagement() {
                       <FormLabel className="text-base font-semibold">Product Options</FormLabel>
                       <p className="text-sm text-muted-foreground">Add options like Size, Color, etc. and their possible values.</p>
                     </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => appendEditOption({ name: '', values: [] })}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Option
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (!editForm.getValues('options')?.some(o => o.name.toLowerCase() === 'size')) {
+                            appendEditOption({ name: 'Size', values: [] });
+                          }
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Size
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (!editForm.getValues('options')?.some(o => o.name.toLowerCase() === 'color')) {
+                            appendEditOption({ name: 'Color', values: [] });
+                          }
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Color
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => appendEditOption({ name: '', values: [] })}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Custom Option
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="space-y-4">

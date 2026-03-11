@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -69,6 +75,7 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }
