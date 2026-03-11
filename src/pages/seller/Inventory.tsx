@@ -451,10 +451,7 @@ export default function SellerInventory() {
                               )}
                               <div className="min-w-0 flex-1">
                                 <p className="font-medium truncate max-w-[200px]" title={product.name}>
-                                  {product.name}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  ID: {product.pid}
+                                {product.name}
                                 </p>
                               </div>
                             </div>

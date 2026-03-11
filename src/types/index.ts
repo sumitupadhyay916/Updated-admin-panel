@@ -48,6 +48,8 @@ export interface Seller extends User {
     email: string;
     role: UserRole;
   };
+  productCount?: number;
+  orderCount?: number;
 }
 
 export interface Consumer extends User {

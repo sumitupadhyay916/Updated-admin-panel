@@ -155,6 +155,8 @@ function App() {
           <Route path="/admin/payouts" element={<PayoutsManagement />} />
           <Route path="/admin/support-pages" element={<SupportPages />} />
           <Route path="/admin/support-pages/:slug" element={<SupportPages />} />
+          <Route path="/admin/coupons" element={<ListCoupon />} />
+          <Route path="/admin/coupons/create" element={<CreateCoupon />} />
         </Route>
 
         {/* Seller & Staff Routes */}

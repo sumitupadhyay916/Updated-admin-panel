@@ -303,30 +303,30 @@ export default function AdminManagement() {
         </div>
       ),
     },
-    {
-      accessorKey: 'permissions',
-      header: 'Permissions',
-      cell: ({ row }: { row: { original: Admin } }) => {
-        const permissions = row.original.permissions || [];
-        return (
-          <div className="flex flex-wrap gap-1">
-            {permissions.slice(0, 2).map((perm) => (
-              <Badge key={perm} variant="secondary" className="text-xs">
-                {perm}
-              </Badge>
-            ))}
-            {permissions.length > 2 && (
-              <Badge variant="secondary" className="text-xs">
-                +{permissions.length - 2}
-              </Badge>
-            )}
-            {permissions.length === 0 && (
-              <span className="text-xs text-gray-400">No permissions</span>
-            )}
-          </div>
-        );
-      },
-    },
+    // {
+    //   accessorKey: 'permissions',
+    //   header: 'Permissions',
+    //   cell: ({ row }: { row: { original: Admin } }) => {
+    //     const permissions = row.original.permissions || [];
+    //     return (
+    //       <div className="flex flex-wrap gap-1">
+    //         {permissions.slice(0, 2).map((perm) => (
+    //           <Badge key={perm} variant="secondary" className="text-xs">
+    //             {perm}
+    //           </Badge>
+    //         ))}
+    //         {permissions.length > 2 && (
+    //           <Badge variant="secondary" className="text-xs">
+    //             +{permissions.length - 2}
+    //           </Badge>
+    //         )}
+    //         {permissions.length === 0 && (
+    //           <span className="text-xs text-gray-400">No permissions</span>
+    //         )}
+    //       </div>
+    //     );
+    //   },
+    // },
     {
       accessorKey: 'status',
       header: 'Status',
