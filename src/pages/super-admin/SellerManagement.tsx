@@ -71,7 +71,6 @@ export default function SellerManagement() {
   const isSuperAdmin = user?.role === 'super_admin';
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);
-  const [sellerStats, setSellerStats] = useState<Record<string, { products: number; orders: number }>>({});
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedSeller, setSelectedSeller] = useState<Seller | null>(null);
@@ -86,26 +85,6 @@ export default function SellerManagement() {
         if (response.success && Array.isArray(response.data)) {
           const list = response.data as Seller[];
           setSellers(list);
-
-          // Load per-seller stats (products/orders) for the activity column
-          const statsEntries = await Promise.all(
-            list.map(async (seller) => {
-              try {
-                const statsRes = await sellersApi.getSellerStats(seller.id);
-                if (statsRes.success && statsRes.data) {
-                  const data = statsRes.data as {
-                    products?: number;
-                    orders?: number;
-                  };
-                  return [seller.id, { products: data.products ?? 0, orders: data.orders ?? 0 }] as const;
-                }
-              } catch (error) {
-                console.error('Failed to load stats for seller', seller.id, error);
-              }
-              return [seller.id, { products: 0, orders: 0 }] as const;
-            }),
-          );
-          setSellerStats(Object.fromEntries(statsEntries));
         } else {
           setSellers([]);
         }
@@ -323,10 +302,6 @@ export default function SellerManagement() {
     setIsViewDialogOpen(true);
   };
 
-  const getSellerStats = (sellerId: string) => {
-    return sellerStats[sellerId] || { products: 0, orders: 0 };
-  };
-
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -388,14 +363,9 @@ export default function SellerManagement() {
         accessorKey: 'totalEarnings',
         header: 'Earnings',
         cell: ({ row }) => (
-          <div>
-            <p className="font-medium text-gray-900 dark:text-white">
-              {formatCurrency(row.original.totalEarnings)}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Available: {formatCurrency(row.original.availableBalance)}
-            </p>
-          </div>
+          <p className="font-medium text-gray-900 dark:text-white">
+            {formatCurrency(row.original.totalEarnings)}
+          </p>
         ),
       },
       {
@@ -407,16 +377,16 @@ export default function SellerManagement() {
         id: 'stats',
         header: 'Activity',
         cell: ({ row }) => {
-          const stats = getSellerStats(row.original.id);
+          const seller = row.original;
           return (
             <div className="flex gap-3">
               <Badge variant="secondary" className="flex items-center gap-1 dark:bg-gray-700">
                 <Package className="h-3 w-3" />
-                {stats.products}
+                {seller.productCount ?? 0}
               </Badge>
               <Badge variant="secondary" className="flex items-center gap-1 dark:bg-gray-700">
                 <ShoppingBag className="h-3 w-3" />
-                {stats.orders}
+                {seller.orderCount ?? 0}
               </Badge>
             </div>
           );
@@ -786,10 +756,6 @@ export default function SellerManagement() {
                   <p className="text-sm text-gray-600 dark:text-gray-400">Phone</p>
                   <p className="font-medium text-gray-900 dark:text-white">{selectedSeller.phone}</p>
                 </div>
-                {/* <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-700">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Commission Rate</p>
-                  <p className="font-medium text-gray-900 dark:text-white">{selectedSeller.commissionRate}%</p>
-                </div> */}
                 <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-700">
                   <p className="text-sm text-gray-600 dark:text-gray-400">GST Number</p>
                   <p className="font-medium text-gray-900 dark:text-white">{selectedSeller.gstNumber || 'N/A'}</p>
@@ -798,20 +764,35 @@ export default function SellerManagement() {
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="rounded-lg bg-orange-50 p-4 text-center dark:bg-orange-950">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Earnings</p>
-                  <p className="text-xl font-bold text-orange-600 dark:text-orange-400">
-                    {formatCurrency(selectedSeller.totalEarnings)}
+                  <p className="text-sm text-orange-600 dark:text-orange-400">Products</p>
+                  <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">
+                    {selectedSeller.productCount ?? 0}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-blue-50 p-4 text-center dark:bg-blue-950">
+                  <p className="text-sm text-blue-600 dark:text-blue-400">Orders</p>
+                  <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                    {selectedSeller.orderCount ?? 0}
                   </p>
                 </div>
                 <div className="rounded-lg bg-green-50 p-4 text-center dark:bg-green-950">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Available</p>
-                  <p className="text-xl font-bold text-green-600 dark:text-green-400">
+                  <p className="text-sm text-green-600 dark:text-green-400">Total Earnings</p>
+                  <p className="text-xl font-bold text-green-700 dark:text-green-300 line-clamp-1">
+                    {formatCurrency(selectedSeller.totalEarnings)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg bg-emerald-50 p-3 text-center dark:bg-emerald-950/30">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Available Balance</p>
+                  <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
                     {formatCurrency(selectedSeller.availableBalance)}
                   </p>
                 </div>
-                <div className="rounded-lg bg-yellow-50 p-4 text-center dark:bg-yellow-950">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Pending</p>
-                  <p className="text-xl font-bold text-yellow-600 dark:text-yellow-400">
+                <div className="rounded-lg bg-amber-50 p-3 text-center dark:bg-amber-950/30">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Pending Balance</p>
+                  <p className="text-lg font-semibold text-amber-600 dark:text-amber-400">
                     {formatCurrency(selectedSeller.pendingBalance)}
                   </p>
                 </div>

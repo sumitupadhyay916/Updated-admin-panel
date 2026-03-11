@@ -38,6 +38,8 @@ const EMPTY: SellerDashData = {
 export default function SellerDashboard() {
   const { user } = useAuthStore();
   const seller = user as any;
+  const isStaff = user?.role === 'staff';
+  const sellerId = isStaff ? (user as any).staffProfile?.sellerId : user?.id;
 
   const [dash, setDash] = useState<SellerDashData>(EMPTY);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
@@ -47,13 +49,13 @@ export default function SellerDashboard() {
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || (isStaff && !sellerId)) return;
     const load = async () => {
       setLoading(true);
       try {
         const [dashRes, ordersRes] = await Promise.all([
           dashboardApi.getSellerDashboard(),
-          sellersApi.getSellerOrders(user.id, { page: 1, limit: 5 }),
+          sellersApi.getSellerOrders(sellerId, { page: 1, limit: 5 }),
         ]);
         if (dashRes.success && dashRes.data) setDash(dashRes.data as SellerDashData);
         if (ordersRes.success && Array.isArray(ordersRes.data)) {
@@ -74,7 +76,7 @@ export default function SellerDashboard() {
     <div className="space-y-6">
       <PageHeader
         title="Seller Dashboard"
-        description={`Welcome back, ${seller?.businessName || seller?.name}`}
+        description={`Welcome back, ${seller?.name}`}
         icon={Store}
       />
 
@@ -237,7 +239,7 @@ export default function SellerDashboard() {
                     <tr key={order.id}>
                       <td className="py-3 font-medium text-gray-900 dark:text-white text-sm">{order.orderNumber}</td>
                       <td className="py-3 text-sm text-gray-700 dark:text-gray-300">
-                        {order.items?.find((i: any) => i.sellerId === user?.id)?.productName || order.items?.[0]?.productName || '—'}
+                        {order.items?.find((i: any) => i.sellerId === sellerId)?.productName || order.items?.[0]?.productName || '—'}
                       </td>
                       <td className="py-3 text-sm font-medium text-gray-900 dark:text-white">
                         {fmt(order.totalAmount)}
