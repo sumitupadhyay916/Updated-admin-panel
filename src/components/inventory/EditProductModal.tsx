@@ -99,28 +99,38 @@ export function EditProductModal({ product, open, onClose, onSuccess }: EditProd
   }, [product]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('Image size must be less than 10MB');
-      return;
+    const largeFiles = files.filter(f => f.size > 10 * 1024 * 1024);
+    if (largeFiles.length > 0) {
+      toast.error('Some images exceed the 10MB limit');
     }
+
+    const validFiles = files.filter(f => f.size <= 10 * 1024 * 1024);
+    if (validFiles.length === 0) return;
 
     setUploading(true);
     try {
-      const response = await productsApi.uploadImage(file);
-      if (response.success && response.data?.url) {
+      const uploadPromises = validFiles.map(file => productsApi.uploadImage(file));
+      const results = await Promise.all(uploadPromises);
+
+      const successfulUrls = results
+        .filter(r => r.success && r.data?.url)
+        .map(r => r.data!.url);
+
+      if (successfulUrls.length > 0) {
         setFormData(prev => ({
           ...prev,
-          images: [...prev.images, response.data!.url],
+          images: [...prev.images, ...successfulUrls],
         }));
-        toast.success('Image uploaded successfully');
+        toast.success(`${successfulUrls.length} image(s) uploaded successfully`);
       }
     } catch (error) {
-      toast.error('Failed to upload image');
+      toast.error('Failed to upload image(s)');
     } finally {
       setUploading(false);
+      e.target.value = ''; // Reset input
     }
   };
 
@@ -228,6 +238,7 @@ export function EditProductModal({ product, open, onClose, onSuccess }: EditProd
                 <input
                   type="file"
                   accept="image/*"
+                  multiple
                   onChange={handleImageUpload}
                   className="hidden"
                   disabled={uploading}

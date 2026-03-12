@@ -82,12 +82,15 @@ const productFormSchemaWithoutSeller = z.object({
   price: z.number().min(0.01, 'Price must be greater than 0'),
   stock: z.enum(['available', 'unavailable']),
   variants: z.array(z.object({
-    color: z.string().optional(),
-    size: z.string().optional(),
     price: z.number().min(0, 'Variant price cannot be negative'),
-    comparePrice: z.number().optional(),
+    comparePrice: z.number().optional().nullable(),
     stock: z.number().min(0, 'Variant stock cannot be negative'),
-    imageUrl: z.string().optional(),
+    images: z.array(z.string()).optional(),
+    optionValueNames: z.record(z.string(), z.string()),
+  })).optional(),
+  options: z.array(z.object({
+    name: z.string().min(1, 'Option name is required'),
+    values: z.array(z.string().min(1, 'Option value is required')),
   })).optional(),
   stockQuantity: z.number().min(0, 'Stock quantity must be 0 or greater').default(0),
 });
@@ -358,6 +361,9 @@ export default function ProductsManagement() {
       variants: (product as any).variants || [],
     });
 
+    // Initialize edit images with current product images
+    setEditUploadedImageUrls(product.images || []);
+
     // Load subcategories for the current category and attempt to match legacy slug if ID is missing
     if (product.categoryId) {
       setIsEditSubcategoriesLoading(true);
@@ -406,10 +412,8 @@ export default function ProductsManagement() {
         subcategoryId: values.subcategoryId && values.subcategoryId !== '__none__'
           ? parseInt(values.subcategoryId, 10)
           : null,
+        images: editUploadedImageUrls,
       };
-      if (editUploadedImageUrls.length > 0) {
-        payload.images = editUploadedImageUrls;
-      }
 
 
       // Admin/SuperAdmin:
@@ -1038,15 +1042,43 @@ export default function ProductsManagement() {
                       <FormLabel className="text-base font-semibold">Product Options</FormLabel>
                       <p className="text-sm text-muted-foreground">Add options like Size, Color, etc. and their possible values.</p>
                     </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => appendOption({ name: '', values: [] })}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Option
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (!form.getValues('options')?.some(o => o.name.toLowerCase() === 'size')) {
+                            appendOption({ name: 'Size', values: [] });
+                          }
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Size
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (!form.getValues('options')?.some(o => o.name.toLowerCase() === 'color')) {
+                            appendOption({ name: 'Color', values: [] });
+                          }
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Color
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => appendOption({ name: '', values: [] })}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Custom Option
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="space-y-4">
@@ -1109,8 +1141,9 @@ export default function ProductsManagement() {
                       className="w-full"
                       onClick={() => {
                         const options = form.getValues('options');
-                        const generated = generateVariants(options || []);
-                        replaceVariants(generated);
+                        if (options) {
+                          replaceVariants(generateVariants(options));
+                        }
                       }}
                     >
                       Generate Variants
@@ -1575,15 +1608,43 @@ export default function ProductsManagement() {
                       <FormLabel className="text-base font-semibold">Product Options</FormLabel>
                       <p className="text-sm text-muted-foreground">Add options like Size, Color, etc. and their possible values.</p>
                     </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => appendEditOption({ name: '', values: [] })}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Option
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (!editForm.getValues('options')?.some(o => o.name.toLowerCase() === 'size')) {
+                            appendEditOption({ name: 'Size', values: [] });
+                          }
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Size
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (!editForm.getValues('options')?.some(o => o.name.toLowerCase() === 'color')) {
+                            appendEditOption({ name: 'Color', values: [] });
+                          }
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Color
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => appendEditOption({ name: '', values: [] })}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Custom Option
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="space-y-4">
@@ -1768,81 +1829,84 @@ export default function ProductsManagement() {
                   </div>
                 )}
 
-                {/* Image Uploader */}
+                {/* Image Uploader - Multiple Images */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Product Image</label>
+                  <label className="text-sm font-medium">Product Images</label>
                   <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4">
-                    {editUploadedImageUrls.length > 0 || editingProduct?.images?.[0] ? (
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={editUploadedImageUrls[0] || editingProduct?.images?.[0] || ''}
-                          alt="Product preview"
-                          className="h-20 w-20 rounded-lg object-cover border"
-                        />
-                        <div className="flex-1">
-                          <p className="text-sm text-green-600 font-medium">✓ {editUploadedImageUrls.length > 0 ? 'New image uploaded' : 'Current image'}</p>
-                          <p className="text-xs text-gray-500 truncate max-w-[200px]">{editUploadedImageUrls[0] || editingProduct?.images?.[0]}</p>
-                        </div>
-                        {editUploadedImageUrls.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => setEditUploadedImageUrls([])}
-                            className="text-gray-400 hover:text-red-500 transition-colors"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        )}
+                    {/* Display uploaded images */}
+                    {editUploadedImageUrls.length > 0 && (
+                      <div className="grid grid-cols-3 gap-3 mb-3">
+                        {editUploadedImageUrls.map((url, index) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={url}
+                              alt={`Product ${index + 1}`}
+                              className="h-20 w-full rounded-lg object-cover border"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setEditUploadedImageUrls(prev => prev.filter((_, i) => i !== index))}
+                              className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                    ) : (
-                      <label className="flex flex-col items-center gap-2 cursor-pointer">
-                        {isEditUploading ? (
-                          <>
-                            <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
-                            <span className="text-sm text-gray-500">Uploading to Cloudinary...</span>
-                          </>
-                        ) : (
-                          <>
-                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
-                              <ImageIcon className="h-6 w-6 text-gray-400" />
-                            </div>
-                            <span className="text-sm text-gray-500">Click to upload product images</span>
-                            <span className="text-xs text-gray-400">JPG, PNG, WEBP up to 10MB</span>
-                          </>
-                        )}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          disabled={isEditUploading}
-                          onChange={async (e) => {
-                            const files = Array.from(e.target.files || []);
-                            if (files.length === 0) return;
-                            setIsEditUploading(true);
-                            try {
-                              const uploadPromises = files.map(file => productsApi.uploadImage(file));
-                              const results = await Promise.all(uploadPromises);
-
-                              const successfulUrls = results
-                                .filter(result => result.success && result.data?.url)
-                                .map(result => result.data!.url);
-
-                              if (successfulUrls.length > 0) {
-                                setEditUploadedImageUrls(prev => [...prev, ...successfulUrls]);
-                                toast.success(`${successfulUrls.length} image(s) uploaded successfully`);
-                              } else {
-                                toast.error('Failed to upload images');
-                              }
-                            } catch {
-                              toast.error('Failed to upload images');
-                            } finally {
-                              setIsEditUploading(false);
-                              e.target.value = '';
-                            }
-                          }}
-                        />
-                      </label>
                     )}
+
+                    {/* Upload button */}
+                    <label className="flex flex-col items-center gap-2 cursor-pointer">
+                      {isEditUploading ? (
+                        <>
+                          <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
+                          <span className="text-sm text-gray-500">Uploading to Cloudinary...</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
+                            <ImageIcon className="h-6 w-6 text-gray-400" />
+                          </div>
+                          <span className="text-sm text-gray-500">
+                            {editUploadedImageUrls.length > 0 ? 'Add more images' : 'Click to upload product images'}
+                          </span>
+                          <span className="text-xs text-gray-400">JPG, PNG, WEBP up to 10MB</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        disabled={isEditUploading}
+                        onChange={async (e) => {
+                          const files = Array.from(e.target.files || []);
+                          if (files.length === 0) return;
+
+                          setIsEditUploading(true);
+                          try {
+                            const uploadPromises = files.map(file => productsApi.uploadImage(file));
+                            const results = await Promise.all(uploadPromises);
+
+                            const successfulUrls = results
+                              .filter(result => result.success && result.data?.url)
+                              .map(result => result.data!.url);
+
+                            if (successfulUrls.length > 0) {
+                              setEditUploadedImageUrls(prev => [...prev, ...successfulUrls]);
+                              toast.success(`${successfulUrls.length} image(s) uploaded successfully`);
+                            } else {
+                              toast.error('Failed to upload images');
+                            }
+                          } catch {
+                            toast.error('Failed to upload images');
+                          } finally {
+                            setIsEditUploading(false);
+                            e.target.value = ''; // Reset input
+                          }
+                        }}
+                      />
+                    </label>
                   </div>
                 </div>
               </div>

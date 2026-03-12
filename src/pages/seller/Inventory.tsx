@@ -265,14 +265,14 @@ export default function SellerInventory() {
 
   // ─── Initial Load ───────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    fetchStats();
-    // Auto-refresh stats every 3 seconds for real-time updates
-    const interval = setInterval(() => {
-      fetchStats();
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [fetchStats]);
+  // useEffect(() => {
+  //   fetchStats();
+  //   // Auto-refresh stats every 3 seconds for real-time updates
+  //   const interval = setInterval(() => {
+  //     fetchStats();
+  //   }, 3000);
+  //   return () => clearInterval(interval);
+  // }, [fetchStats]);
 
   useEffect(() => {
     fetchProducts();

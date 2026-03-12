@@ -98,7 +98,7 @@ export default function SellerDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="dark:border-gray-700 dark:bg-gray-800">
+        {/* <Card className="dark:border-gray-700 dark:bg-gray-800">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -112,9 +112,9 @@ export default function SellerDashboard() {
               </div>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
 
-        <Card className="dark:border-gray-700 dark:bg-gray-800">
+        {/* <Card className="dark:border-gray-700 dark:bg-gray-800">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -128,16 +128,16 @@ export default function SellerDashboard() {
               </div>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
       {/* KPI Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <StatCard title="Total Orders"   value={dash.totalOrders}    icon={ShoppingBag} />
-        <StatCard title="My Products"    value={dash.myProducts}     icon={Package} />
-        <StatCard title="Pending Orders" value={dash.pendingOrders}  icon={TrendingUp} />
-        <StatCard title="Delivered"      value={dash.deliveredOrders} icon={CheckCircle} />
-        <StatCard title="Total Reviews"  value={dash.totalReviews}   icon={Star} />
+        <StatCard title="Total Orders" value={dash.totalOrders} icon={ShoppingBag} />
+        <StatCard title="My Products" value={dash.myProducts} icon={Package} />
+        <StatCard title="Pending Orders" value={dash.pendingOrders} icon={TrendingUp} />
+        <StatCard title="Delivered" value={dash.deliveredOrders} icon={CheckCircle} />
+        <StatCard title="Total Reviews" value={dash.totalReviews} icon={Star} />
       </div>
 
       {/* Charts */}
@@ -161,7 +161,7 @@ export default function SellerDashboard() {
                 <LineChart data={dash.chartData}>
                   <CartesianGrid strokeDasharray="3 3" className="dark:stroke-gray-700" />
                   <XAxis dataKey="name" stroke="#888" tick={{ fontSize: 12 }} />
-                  <YAxis stroke="#888" tick={{ fontSize: 12 }} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
+                  <YAxis stroke="#888" tick={{ fontSize: 12 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
                   <Tooltip
                     contentStyle={{ backgroundColor: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px' }}
                     formatter={(v: number) => [fmt(v), 'Revenue']}
