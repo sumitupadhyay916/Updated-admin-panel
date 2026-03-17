@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { couponsApi } from '@/services/api';
-import { Ticket, Plus, Trash, Edit, Eye } from 'lucide-react';
+import { Ticket, Plus, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -103,7 +103,7 @@ export default function ListCoupon() {
                            </Link>
                         </Button> */}
                         <Button variant="ghost" size="icon" onClick={() => handleDelete(coupon.id)} className="text-red-500 hover:text-red-600 hover:bg-red-50">
-                          <Trash className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </td>

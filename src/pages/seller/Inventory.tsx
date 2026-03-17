@@ -6,12 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -38,7 +32,6 @@ import { toast } from 'sonner';
 import {
   Package,
   Search,
-  ChevronDown,
   Eye,
   Edit,
   Trash2,
@@ -265,14 +258,14 @@ export default function SellerInventory() {
 
   // ─── Initial Load ───────────────────────────────────────────────────────────
 
-  // useEffect(() => {
-  //   fetchStats();
-  //   // Auto-refresh stats every 3 seconds for real-time updates
-  //   const interval = setInterval(() => {
-  //     fetchStats();
-  //   }, 3000);
-  //   return () => clearInterval(interval);
-  // }, [fetchStats]);
+  useEffect(() => {
+    fetchStats();
+    // Auto-refresh stats every 3 seconds for real-time updates
+    const interval = setInterval(() => {
+      fetchStats();
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [fetchStats]);
 
   useEffect(() => {
     fetchProducts();
@@ -451,7 +444,7 @@ export default function SellerInventory() {
                               )}
                               <div className="min-w-0 flex-1">
                                 <p className="font-medium truncate max-w-[200px]" title={product.name}>
-                                {product.name}
+                                  {product.name}
                                 </p>
                               </div>
                             </div>
@@ -487,36 +480,37 @@ export default function SellerInventory() {
                           </TableCell>
                           <TableCell>{fmtDate(product.createdAt)}</TableCell>
                           <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <ChevronDown className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onClick={() => setViewDialog({ open: true, product })}
-                                >
-                                  <Eye className="mr-2 h-4 w-4" />
-                                  View
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => setEditDialog({ open: true, product })}
-                                >
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    setDeleteDialog({ open: true, product })
-                                  }
-                                  className="text-destructive"
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                onClick={() => setViewDialog({ open: true, product })}
+                                title="View Details"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                                onClick={() => setEditDialog({ open: true, product })}
+                                title="Edit Product"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() =>
+                                  setDeleteDialog({ open: true, product })
+                                }
+                                title="Delete Product"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );

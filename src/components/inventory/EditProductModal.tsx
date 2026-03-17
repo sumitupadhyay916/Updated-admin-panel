@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
@@ -46,6 +47,8 @@ interface Product {
   images: string[];
   sellerId: string;
   sellerName: string;
+  hasVariants?: boolean;
+  variants?: any[];
   isFeatured: boolean;
   tags: string[];
   createdAt: string;
@@ -77,6 +80,7 @@ export function EditProductModal({ product, open, onClose, onSuccess }: EditProd
     lowStockThreshold: '',
   });
   const [stockAdjustment, setStockAdjustment] = useState<string>('');
+  const [variantAdjustments, setVariantAdjustments] = useState<{ variantId: string; adjustment: string; stockQuantity: number; }[]>([]);
 
   useEffect(() => {
     if (product) {
@@ -95,6 +99,11 @@ export function EditProductModal({ product, open, onClose, onSuccess }: EditProd
         lowStockThreshold: product.lowStockThreshold?.toString() || '5',
       });
       setStockAdjustment('');
+      if (product.hasVariants && product.variants) {
+        setVariantAdjustments(product.variants.map(v => ({ variantId: v.id, adjustment: '', stockQuantity: v.stockQuantity })));
+      } else {
+        setVariantAdjustments([]);
+      }
     }
   }, [product]);
 
@@ -142,21 +151,41 @@ export function EditProductModal({ product, open, onClose, onSuccess }: EditProd
   };
 
   const handleStockAdjustment = async () => {
-    if (!product || !stockAdjustment) return;
+    if (!product) return;
 
-    const adjustment = parseInt(stockAdjustment, 10);
-    if (isNaN(adjustment) || adjustment === 0) {
-      toast.error('Please enter a valid adjustment value');
-      return;
-    }
+    if (product.hasVariants) {
+      // Filter out empty adjustments
+      const validAdjustments = variantAdjustments.filter(va => va.adjustment !== '' && !isNaN(parseInt(va.adjustment, 10)) && parseInt(va.adjustment, 10) !== 0);
+      if (validAdjustments.length === 0) {
+        toast.error('Please enter valid adjustment values for at least one variant');
+        return;
+      }
+      try {
+        await productsApi.adjustProductStock(product.id, {
+          variantAdjustments: validAdjustments.map(va => ({ variantId: va.variantId, adjustment: parseInt(va.adjustment, 10) }))
+        });
+        toast.success(`Variant stock adjusted successfully`);
+        setVariantAdjustments(variantAdjustments.map(va => ({ ...va, adjustment: '' })));
+        onSuccess();
+      } catch (error) {
+        toast.error('Failed to adjust variant stock');
+      }
+    } else {
+      if (!stockAdjustment) return;
+      const adjustment = parseInt(stockAdjustment, 10);
+      if (isNaN(adjustment) || adjustment === 0) {
+        toast.error('Please enter a valid adjustment value');
+        return;
+      }
 
-    try {
-      await productsApi.adjustProductStock(product.id, adjustment);
-      toast.success(`Stock adjusted by ${adjustment > 0 ? '+' : ''}${adjustment}`);
-      setStockAdjustment('');
-      onSuccess();
-    } catch (error) {
-      toast.error('Failed to adjust stock');
+      try {
+        await productsApi.adjustProductStock(product.id, { adjustment });
+        toast.success(`Stock adjusted by ${adjustment > 0 ? '+' : ''}${adjustment}`);
+        setStockAdjustment('');
+        onSuccess();
+      } catch (error) {
+        toast.error('Failed to adjust stock');
+      }
     }
   };
 
@@ -211,6 +240,9 @@ export function EditProductModal({ product, open, onClose, onSuccess }: EditProd
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Product</DialogTitle>
+          <DialogDescription>
+            Update product details, pricing, and stock levels.
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -348,43 +380,93 @@ export function EditProductModal({ product, open, onClose, onSuccess }: EditProd
           {/* Stock Adjustment */}
           <div className="border-t pt-4">
             <Label className="text-base font-semibold mb-3 block">Quick Stock Adjustment</Label>
-            <div className="flex items-center gap-2">
-              <Select value={stockAdjustment} onValueChange={setStockAdjustment}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Select adjustment" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="5">+5</SelectItem>
-                  <SelectItem value="10">+10</SelectItem>
-                  <SelectItem value="20">+20</SelectItem>
-                  <SelectItem value="-5">-5</SelectItem>
-                  <SelectItem value="-10">-10</SelectItem>
-                  <SelectItem value="-20">-20</SelectItem>
-                  <SelectItem value="custom">Custom</SelectItem>
-                </SelectContent>
-              </Select>
+            
+            {product.hasVariants && product.variants ? (
+              <div className="space-y-4">
+                <p className="text-sm text-gray-500 mb-2">Adjust stock per variant. Values will calculate the new total product stock.</p>
+                <div className="grid grid-cols-1 gap-3 max-h-60 overflow-y-auto pr-2">
+                  {product.variants.map((variant) => {
+                    const adjustmentState = variantAdjustments.find(va => va.variantId === variant.id);
+                    return (
+                      <div key={variant.id} className="flex items-center gap-4 bg-gray-50 p-2 rounded justify-between border">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">
+                            {variant.color || 'Default Color'} {variant.size ? `- ${variant.size}` : ''} {variant.quality ? `- ${variant.quality}` : ''}
+                          </p>
+                          <p className="text-xs text-gray-500">Current Stock: {variant.stockQuantity}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                           <Input
+                              type="number"
+                              placeholder="+/- value"
+                              className="w-24"
+                              value={adjustmentState?.adjustment || ''}
+                              onChange={(e) => {
+                                setVariantAdjustments(prev => prev.map(va => 
+                                  va.variantId === variant.id ? { ...va, adjustment: e.target.value } : va
+                                ));
+                                // Automatically select 'custom' if not using dropdown, but since we just use inputs for variants, we do it directly.
+                              }}
+                            />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="pt-2">
+                    <Button
+                      type="button"
+                      onClick={handleStockAdjustment}
+                      variant="outline"
+                      disabled={!variantAdjustments.some(va => va.adjustment !== '' && !isNaN(parseInt(va.adjustment, 10)) && parseInt(va.adjustment, 10) !== 0)}
+                    >
+                      Apply Variant Adjustments
+                    </Button>
+                </div>
+              </div>
+            ) : (
+              // Non-variant stock UI
+              <div className="flex items-center gap-2">
+                  <Select value={stockAdjustment} onValueChange={setStockAdjustment}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Select adjustment" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">+5</SelectItem>
+                      <SelectItem value="10">+10</SelectItem>
+                      <SelectItem value="20">+20</SelectItem>
+                      <SelectItem value="-5">-5</SelectItem>
+                      <SelectItem value="-10">-10</SelectItem>
+                      <SelectItem value="-20">-20</SelectItem>
+                      <SelectItem value="custom">Custom</SelectItem>
+                    </SelectContent>
+                  </Select>
 
-              {stockAdjustment === 'custom' && (
-                <Input
-                  type="number"
-                  placeholder="Enter value"
-                  className="w-32"
-                  onChange={(e) => setStockAdjustment(e.target.value)}
-                />
-              )}
+                  {stockAdjustment === 'custom' && (
+                    <Input
+                      type="number"
+                      placeholder="Enter value"
+                      className="w-32"
+                      onChange={(e) => setStockAdjustment(e.target.value)}
+                    />
+                  )}
 
-              <Button
-                type="button"
-                onClick={handleStockAdjustment}
-                disabled={!stockAdjustment || stockAdjustment === 'custom'}
-                variant="outline"
-              >
-                Apply Adjustment
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Adjust stock levels. Positive values increase stock, negative values decrease it.
-            </p>
+                  <Button
+                    type="button"
+                    onClick={handleStockAdjustment}
+                    disabled={!stockAdjustment || stockAdjustment === 'custom'}
+                    variant="outline"
+                  >
+                    Apply Adjustment
+                  </Button>
+              </div>
+            )}
+            
+            {!product.hasVariants && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Adjust stock levels. Positive values increase stock, negative values decrease it.
+                </p>
+            )}
           </div>
 
           {/* Additional Details */}

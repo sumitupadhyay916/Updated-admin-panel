@@ -61,7 +61,7 @@ export default function CreateCoupon() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('general');
 
-  const form = useForm<CouponFormValues>({
+  const form = useForm<any>({
     resolver: zodResolver(couponSchema),
     defaultValues: {
       title: '',
