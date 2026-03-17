@@ -18,10 +18,8 @@ import {
   Package,
   ShoppingCart,
   Warehouse,
-  BarChart3,
   Wallet,
   Ticket,
-  MessageSquare,
   Settings,
   FileText,
   LogOut,
@@ -31,7 +29,6 @@ import {
   Sun,
   HelpCircle,
   Shield,
-  BookOpen,
 } from 'lucide-react';
 
 interface NavItem {

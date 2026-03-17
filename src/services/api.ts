@@ -271,6 +271,27 @@ export interface CreateProductRequest {
   price: number;
   stock?: 'available' | 'unavailable';
   sellerId?: string;
+  hasVariants?: boolean;
+  variants?: Array<{
+    size?: string;
+    color?: string;
+    quality?: string;
+    price: number;
+    mrp: number;
+    stockQuantity: number;
+    images?: string[];
+  }>;
+  brand?: string;
+  care?: string;
+  materials?: string;
+  ageGroups?: string[];
+  isNew?: boolean;
+  isBestseller?: boolean;
+  dimensions?: {
+    h: number;
+    l: number;
+    w: number;
+  };
   // Optional fields for full product creation
   deity?: string;
   material?: string;
@@ -310,6 +331,27 @@ export interface UpdateProductRequest {
   tags?: string[];
   isFeatured?: boolean;
   subcategoryId?: number | null;
+  hasVariants?: boolean;
+  variants?: Array<{
+    size?: string;
+    color?: string;
+    quality?: string;
+    price: number;
+    mrp: number;
+    stockQuantity: number;
+    images?: string[];
+  }>;
+  brand?: string;
+  care?: string;
+  materials?: string;
+  ageGroups?: string[];
+  isNew?: boolean;
+  isBestseller?: boolean;
+  dimensions?: {
+    h: number;
+    l: number;
+    w: number;
+  };
 }
 
 
@@ -424,8 +466,8 @@ export const productsApi = {
     return response.data;
   },
 
-  adjustProductStock: async (id: string | number, adjustment: number): Promise<ApiResponse<unknown>> => {
-    const response = await apiClient.post(`/products/${id}/adjust-stock`, { adjustment });
+  adjustProductStock: async (id: string | number, data: { adjustment?: number; variantAdjustments?: Array<{ variantId: string; adjustment: number }> }): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.post(`/products/${id}/adjust-stock`, data);
     return response.data;
   },
 };

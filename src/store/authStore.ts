@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 // UserRole is probably missing 'staff', but this is just an example of modifying imports if needed.
-import type { User, UserRole as BaseUserRole, LoginCredentials, SuperAdmin, Admin } from '@/types';
+import type { User, UserRole as BaseUserRole, LoginCredentials } from '@/types';
 type UserRole = BaseUserRole | 'staff';
 import { authApi } from '@/services/api';
 

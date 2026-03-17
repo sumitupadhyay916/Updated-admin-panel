@@ -46,53 +46,80 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
 
-// Schema for super_admin and admin (sellerId optional; defaults to "My Products")
-const productFormSchemaWithSeller = z.object({
-  name: z.string().min(1, 'Product name is required').min(2, 'Product name must be at least 2 characters'),
-  categoryId: z.string().min(1, 'Category is required'),
-  subcategoryId: z.string().optional(),
-  sellerId: z.string().optional(),
-  price: z.number().min(0.01, 'Price must be greater than 0'),
-  stock: z.enum(['available', 'unavailable']),
-  variants: z.array(z.object({
-    price: z.number().min(0, 'Variant price cannot be negative'),
-    comparePrice: z.number().optional().nullable(),
-    stock: z.number().min(0, 'Variant stock cannot be negative'),
-    images: z.array(z.string()).optional(),
-    optionValueNames: z.record(z.string(), z.string()),
-  })).optional(),
-  options: z.array(z.object({
-    name: z.string().min(1, 'Option name is required'),
-    values: z.array(z.string().min(1, 'Option value is required')),
-  })).optional(),
-  stockQuantity: z.number().min(0, 'Stock quantity must be 0 or greater').default(0),
+// ── Color-Group Variant Types ─────────────────────────────────────────────────
+interface SizeEntry {
+  size: string;
+  quality: string;
+  price: number;
+  mrp: number;
+  stockQuantity: number;
+}
+interface ColorGroup {
+  id: string;
+  color: string;
+  colorHex: string;
+  images: string[];
+  sizes: SizeEntry[];
+  imageUploading?: boolean;
+}
+const makeColorGroup = (): ColorGroup => ({
+  id: Math.random().toString(36).slice(2),
+  color: '',
+  colorHex: '#ffffff',
+  images: [],
+  sizes: [{ size: '', quality: '', price: 0, mrp: 0, stockQuantity: 0 }],
 });
 
-// Schema for seller (sellerId not required, will be auto-set)
-const productFormSchemaWithoutSeller = z.object({
+// Flat variant item schema
+const variantItemSchema = z.object({
+  size: z.string().optional().default(''),
+  color: z.string().optional().default(''),
+  quality: z.string().optional().default(''),
+  price: z.number().min(0, 'Variant price cannot be negative').default(0),
+  mrp: z.number().min(0, 'MRP cannot be negative').default(0),
+  stockQuantity: z.number().min(0, 'Stock cannot be negative').default(0),
+  images: z.array(z.string()).default([]),
+});
+
+// Shared base schema fields
+const baseProductSchema = {
   name: z.string().min(1, 'Product name is required').min(2, 'Product name must be at least 2 characters'),
   categoryId: z.string().min(1, 'Category is required'),
   subcategoryId: z.string().optional(),
-  sellerId: z.string().optional(),
-  price: z.number().min(0.01, 'Price must be greater than 0'),
+  hasVariants: z.boolean().default(false),
+  price: z.number().min(0).optional(),
+  comparePrice: z.number().min(0).optional(),
   stock: z.enum(['available', 'unavailable']),
-  variants: z.array(z.object({
-    price: z.number().min(0, 'Variant price cannot be negative'),
-    comparePrice: z.number().optional().nullable(),
-    stock: z.number().min(0, 'Variant stock cannot be negative'),
-    images: z.array(z.string()).optional(),
-    optionValueNames: z.record(z.string(), z.string()),
-  })).optional(),
-  options: z.array(z.object({
-    name: z.string().min(1, 'Option name is required'),
-    values: z.array(z.string().min(1, 'Option value is required')),
-  })).optional(),
   stockQuantity: z.number().min(0, 'Stock quantity must be 0 or greater').default(0),
+  variants: z.array(variantItemSchema).optional().default([]),
+  brand: z.string().optional(),
+  care: z.string().optional(),
+  materials: z.string().optional(),
+  ageGroups: z.array(z.string()).optional().default([]),
+  isNew: z.boolean().default(false),
+  isBestseller: z.boolean().default(false),
+  dimensions: z.object({
+    h: z.number().optional().default(0),
+    l: z.number().optional().default(0),
+    w: z.number().optional().default(0),
+  }).optional().default({h:0, l:0, w:0}),
+};
+
+// Schema for super_admin and admin (sellerId optional)
+const productFormSchemaWithSeller = z.object({
+  ...baseProductSchema,
+  sellerId: z.string().optional(),
+});
+
+// Schema for seller (sellerId not required, auto-set)
+const productFormSchemaWithoutSeller = z.object({
+  ...baseProductSchema,
+  sellerId: z.string().optional(),
 });
 
 type ProductFormValues = z.infer<typeof productFormSchemaWithSeller>;
@@ -115,13 +142,19 @@ export default function ProductsManagement() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [sellerFilter, setSellerFilter] = useState<string>('__all__');
-  // Image upload state - now supports multiple images
+  // Image upload state - supports multiple images
   const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [editUploadedImageUrls, setEditUploadedImageUrls] = useState<string[]>([]);
   const [isEditUploading, setIsEditUploading] = useState(false);
   const [isSubcategoriesLoading, setIsSubcategoriesLoading] = useState(false);
   const [isEditSubcategoriesLoading, setIsEditSubcategoriesLoading] = useState(false);
+  // hasVariants toggle state
+  const [addHasVariants, setAddHasVariants] = useState(false);
+  const [editHasVariants, setEditHasVariants] = useState(false);
+  // ── Color-Group state for grouped variant UI ──
+  const [addColorGroups, setAddColorGroups] = useState<ColorGroup[]>([]);
+  const [editColorGroups, setEditColorGroups] = useState<ColorGroup[]>([]);
 
   // Quick Create State
   const [isQuickAddSubcategoryOpen, setIsQuickAddSubcategoryOpen] = useState(false);
@@ -138,11 +171,19 @@ export default function ProductsManagement() {
       categoryId: '',
       subcategoryId: '',
       sellerId: isSeller ? '' : '__my__',
+      hasVariants: false,
       price: 0,
+      comparePrice: 0,
       stock: 'available',
-      options: [],
       variants: [],
       stockQuantity: 0,
+      brand: '',
+      care: '',
+      materials: '',
+      ageGroups: [],
+      isNew: false,
+      isBestseller: false,
+      dimensions: { h: 0, l: 0, w: 0 },
     },
   });
 
@@ -153,59 +194,23 @@ export default function ProductsManagement() {
       categoryId: '',
       subcategoryId: '',
       sellerId: isSeller ? '' : '__my__',
+      hasVariants: false,
       price: 0,
+      comparePrice: 0,
       stock: 'available',
-      options: [],
       variants: [],
       stockQuantity: 0,
+      brand: '',
+      care: '',
+      materials: '',
+      ageGroups: [],
+      isNew: false,
+      isBestseller: false,
+      dimensions: { h: 0, l: 0, w: 0 },
     },
   });
 
-  const { fields: variantFields, remove: removeVariant, replace: replaceVariants } = useFieldArray({
-    control: form.control,
-    name: "variants"
-  });
 
-  const { fields: optionFields, append: appendOption, remove: removeOption } = useFieldArray({
-    control: form.control,
-    name: "options"
-  });
-
-  const { fields: editVariantFields, remove: removeEditVariant, replace: replaceEditVariants } = useFieldArray({
-    control: editForm.control,
-    name: "variants"
-  });
-
-  const { fields: editOptionFields, append: appendEditOption, remove: removeEditOption } = useFieldArray({
-    control: editForm.control,
-    name: "options"
-  });
-
-  const generateVariants = useCallback((options: { name: string, values: string[] }[]) => {
-    if (options.length === 0) return [];
-
-    let combinations: Record<string, string>[] = [{}];
-
-    options.forEach(option => {
-      const newCombinations: Record<string, string>[] = [];
-      combinations.forEach(combo => {
-        option.values.forEach(value => {
-          newCombinations.push({
-            ...combo,
-            [option.name]: value
-          });
-        });
-      });
-      combinations = newCombinations;
-    });
-
-    return combinations.map(combo => ({
-      price: form.getValues('price') || 0,
-      stock: 0,
-      optionValueNames: combo,
-      images: []
-    }));
-  }, [form]);
 
   const loadProducts = useCallback(async () => {
     setIsLoading(true);
@@ -284,25 +289,59 @@ export default function ProductsManagement() {
   const handleCreateProduct = async (values: ProductFormValues) => {
     try {
       setIsLoading(true);
+      // Variant validation (grouped model)
+      if (addHasVariants) {
+        if (addColorGroups.length === 0) {
+          toast.error('Add at least one color group before submitting'); setIsLoading(false); return;
+        }
+        for (const cg of addColorGroups) {
+          if (!cg.color.trim()) { toast.error('All color groups must have a color name'); setIsLoading(false); return; }
+          if (cg.sizes.length === 0) { toast.error(`Color "${cg.color}" must have at least one size`); setIsLoading(false); return; }
+          for (const s of cg.sizes) {
+            if ((s.price ?? 0) <= 0) { toast.error(`Price must be > 0 for all sizes in "${cg.color}"`); setIsLoading(false); return; }
+            if ((s.mrp ?? 0) < (s.price ?? 0)) { toast.error(`MRP must be ≥ Price in "${cg.color}"`); setIsLoading(false); return; }
+          }
+        }
+      }
+      // Flatten ColorGroups → flat variants array for backend
+      const flatVariants = addHasVariants
+        ? addColorGroups.flatMap(cg =>
+            cg.sizes.map(s => ({
+              color: cg.color,
+              colorHex: cg.colorHex,
+              size: s.size,
+              quality: s.quality,
+              price: s.price,
+              mrp: s.mrp,
+              stockQuantity: s.stockQuantity,
+              images: cg.images,
+            }))
+          )
+        : [];
       const payload: any = {
         name: values.name,
         categoryId: parseInt(values.categoryId, 10),
-        price: values.price,
+        hasVariants: addHasVariants,
         stock: values.stock,
-        variants: values.variants,
-        stockQuantity: values.stockQuantity || 0,
+        brand: values.brand,
+        care: values.care,
+        materials: values.materials,
+        ageGroups: values.ageGroups,
+        isNew: values.isNew,
+        isBestseller: values.isBestseller,
+        dimensions: values.dimensions,
       };
       if (values.subcategoryId && values.subcategoryId !== '__none__') {
         payload.subcategoryId = parseInt(values.subcategoryId, 10);
       }
-      if (uploadedImageUrls.length > 0) {
-        payload.images = uploadedImageUrls;
+      if (addHasVariants) {
+        payload.variants = flatVariants;
+      } else {
+        payload.price = values.price;
+        payload.comparePrice = values.comparePrice;
+        payload.stockQuantity = values.stockQuantity || 0;
+        if (uploadedImageUrls.length > 0) payload.images = uploadedImageUrls;
       }
-
-
-      // Admin/SuperAdmin:
-      // - empty sellerId or "__my__" => create under current admin (My Products)
-      // - sellerId selected => create under that seller
       if (!isSeller) {
         if (!values.sellerId || values.sellerId === '__my__') {
           payload.sellerId = user?.id;
@@ -310,25 +349,28 @@ export default function ProductsManagement() {
           payload.sellerId = values.sellerId;
         }
       }
-
       const response = await productsApi.createProduct(payload);
       if (response.success && response.data) {
         toast.success('Product created successfully');
         setIsAddDialogOpen(false);
         setUploadedImageUrls([]);
+        setAddHasVariants(false);
+        setAddColorGroups([]);
         form.reset({
           name: '',
           categoryId: '',
           subcategoryId: '',
           sellerId: isSeller ? '' : '__my__',
+          hasVariants: false,
           price: 0,
+          comparePrice: 0,
           stock: 'available',
           stockQuantity: 0,
+          variants: [],
         });
         setSubcategories([]);
-
         await loadProducts();
-        await loadCategories(); // Refresh categories to update product count
+        await loadCategories();
       } else {
         toast.error(response.message || 'Failed to create product');
       }
@@ -348,23 +390,54 @@ export default function ProductsManagement() {
 
   const openEditDialog = useCallback(async (product: Product) => {
     setEditingProduct(product);
+    const hasVariants = (product as any).hasVariants ?? false;
+    setEditHasVariants(hasVariants);
 
-    // Initial reset with available data
+    const rawVariants = (product as any).variants || [];
+    const colorGroupsMap = new Map<string, ColorGroup>();
+    rawVariants.forEach((v: any) => {
+      const colorKey = v.color || 'Default';
+      if (!colorGroupsMap.has(colorKey)) {
+        colorGroupsMap.set(colorKey, {
+          id: Math.random().toString(36).slice(2),
+          color: colorKey,
+          colorHex: v.colorHex || '#ffffff',
+          images: Array.isArray(v.images) ? v.images.map((img: any) => img.url || img).filter(Boolean) : [],
+          sizes: []
+        });
+      }
+      colorGroupsMap.get(colorKey)!.sizes.push({
+        size: v.size || '',
+        quality: v.quality || '',
+        price: v.price || 0,
+        mrp: v.mrp || 0,
+        stockQuantity: v.stockQuantity || 0
+      });
+    });
+    setEditColorGroups(Array.from(colorGroupsMap.values()));
+
     editForm.reset({
       name: product.name,
       categoryId: product.categoryId.toString(),
       subcategoryId: product.subcategoryId?.toString() || '',
       sellerId: !isSeller && user?.id && product.sellerId === user.id ? '__my__' : (product.sellerId || ''),
+      hasVariants,
       price: product.price,
+      comparePrice: (product as any).comparePrice ?? 0,
       stock: product.stock,
       stockQuantity: product.stockQuantity,
-      variants: (product as any).variants || [],
+      variants: [],
+      brand: (product as any).brand || '',
+      care: (product as any).care || '',
+      materials: (product as any).materials || '',
+      ageGroups: Array.isArray((product as any).ageGroups) ? (product as any).ageGroups : [],
+      isNew: !!(product as any).isNew,
+      isBestseller: !!(product as any).isBestseller,
+      dimensions: (product as any).dimensions || { h: 0, l: 0, w: 0 },
     });
 
-    // Initialize edit images with current product images
     setEditUploadedImageUrls(product.images || []);
 
-    // Load subcategories for the current category and attempt to match legacy slug if ID is missing
     if (product.categoryId) {
       setIsEditSubcategoriesLoading(true);
       try {
@@ -372,19 +445,12 @@ export default function ProductsManagement() {
         if (res.success) {
           const subs = res.data || [];
           setEditSubcategories(subs);
-
-          // If subcategoryId is missing but we have a slug, try to find the ID and update form
           if (!product.subcategoryId && product.subcategorySlug) {
             const match = subs.find(s => s.slug === product.subcategorySlug);
-            if (match) {
-              editForm.setValue('subcategoryId', match.id.toString());
-            }
+            if (match) editForm.setValue('subcategoryId', match.id.toString());
           } else {
-            // Even if ID is present, re-apply it after subs are loaded to ensure the Select component matches it
             const currentSubId = editForm.getValues('subcategoryId');
-            if (currentSubId) {
-              editForm.setValue('subcategoryId', currentSubId);
-            }
+            if (currentSubId) editForm.setValue('subcategoryId', currentSubId);
           }
         }
       } catch (err) {
@@ -399,26 +465,61 @@ export default function ProductsManagement() {
 
   const handleUpdateProduct = async (values: ProductFormValues) => {
     if (!editingProduct) return;
-
     try {
       setIsLoading(true);
+      // Variant validation (grouped model)
+      if (editHasVariants) {
+        if (editColorGroups.length === 0) {
+          toast.error('Add at least one color group before saving'); setIsLoading(false); return;
+        }
+        for (const cg of editColorGroups) {
+          if (!cg.color.trim()) { toast.error('All color groups must have a color name'); setIsLoading(false); return; }
+          if (cg.sizes.length === 0) { toast.error(`Color "${cg.color}" must have at least one size`); setIsLoading(false); return; }
+          for (const s of cg.sizes) {
+            if ((s.price ?? 0) <= 0) { toast.error(`Price must be > 0 for all sizes in "${cg.color}"`); setIsLoading(false); return; }
+            if ((s.mrp ?? 0) < (s.price ?? 0)) { toast.error(`MRP must be ≥ Price in "${cg.color}"`); setIsLoading(false); return; }
+          }
+        }
+      }
+      // Flatten ColorGroups → flat variants array for backend
+      const flatVariants = editHasVariants
+        ? editColorGroups.flatMap(cg =>
+            cg.sizes.map(s => ({
+              color: cg.color,
+              colorHex: cg.colorHex,
+              size: s.size,
+              quality: s.quality,
+              price: s.price,
+              mrp: s.mrp,
+              stockQuantity: s.stockQuantity,
+              images: cg.images,
+            }))
+          )
+        : [];
       const payload: any = {
         name: values.name,
         categoryId: parseInt(values.categoryId, 10),
-        price: values.price,
+        hasVariants: editHasVariants,
         stock: values.stock,
-        stockQuantity: values.stockQuantity,
-        variants: values.variants,
         subcategoryId: values.subcategoryId && values.subcategoryId !== '__none__'
           ? parseInt(values.subcategoryId, 10)
           : null,
-        images: editUploadedImageUrls,
+        brand: values.brand,
+        care: values.care,
+        materials: values.materials,
+        ageGroups: values.ageGroups,
+        isNew: values.isNew,
+        isBestseller: values.isBestseller,
+        dimensions: values.dimensions,
       };
-
-
-      // Admin/SuperAdmin:
-      // - empty sellerId or "__my__" => move to My Products (admin-owned)
-      // - sellerId selected => assign to that seller
+      if (editHasVariants) {
+        payload.variants = flatVariants;
+      } else {
+        payload.price = values.price;
+        payload.comparePrice = values.comparePrice;
+        payload.stockQuantity = values.stockQuantity;
+        payload.images = editUploadedImageUrls;
+      }
       if (!isSeller) {
         if (!values.sellerId || values.sellerId === '__my__') {
           payload.sellerId = user?.id;
@@ -426,25 +527,29 @@ export default function ProductsManagement() {
           payload.sellerId = values.sellerId;
         }
       }
-
       const response = await productsApi.updateProduct(editingProduct.id, payload);
       if (response.success && response.data) {
         toast.success('Product updated successfully');
         setIsEditDialogOpen(false);
         setEditingProduct(null);
         setEditUploadedImageUrls([]);
+        setEditHasVariants(false);
+        setEditColorGroups([]);
         editForm.reset({
           name: '',
           categoryId: '',
           subcategoryId: '',
           sellerId: '',
+          hasVariants: false,
           price: 0,
+          comparePrice: 0,
           stock: 'available',
           stockQuantity: 0,
+          variants: [],
         });
         setEditSubcategories([]);
         await loadProducts();
-        await loadCategories(); // Refresh categories to update product count
+        await loadCategories();
       } else {
         toast.error(response.message || 'Failed to update product');
       }
@@ -823,6 +928,7 @@ export default function ProductsManagement() {
               price: 0,
               stock: 'available',
               stockQuantity: 0,
+              brand: '', care: '', materials: '', ageGroups: [], isNew: false, isBestseller: false, dimensions: { h: 0, l: 0, w: 0 }
             });
             setSubcategories([]);
           }
@@ -968,381 +1074,330 @@ export default function ProductsManagement() {
                     )}
                   />
                 )}
-                <FormField
-                  control={form.control}
-                  name="price"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Price</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="0.00"
-                          step="0.01"
-                          min="0"
-                          {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                          value={field.value || 0}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="stock"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Stock</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select stock status" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="available">Available</SelectItem>
-                          <SelectItem value="unavailable">Unavailable</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="stockQuantity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Initial Stock Quantity</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="0"
-                          min="0"
-                          step="1"
-                          {...field}
-                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                          value={field.value || 0}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Set the initial stock quantity for this product
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Product Options Section */}
-                <div className="space-y-4 pt-4 border-t">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <FormLabel className="text-base font-semibold">Product Options</FormLabel>
-                      <p className="text-sm text-muted-foreground">Add options like Size, Color, etc. and their possible values.</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          if (!form.getValues('options')?.some(o => o.name.toLowerCase() === 'size')) {
-                            appendOption({ name: 'Size', values: [] });
-                          }
-                        }}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Size
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          if (!form.getValues('options')?.some(o => o.name.toLowerCase() === 'color')) {
-                            appendOption({ name: 'Color', values: [] });
-                          }
-                        }}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Color
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => appendOption({ name: '', values: [] })}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Custom Option
-                      </Button>
-                    </div>
+                {/* ── Has Variants Toggle ── */}
+                <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                  <div>
+                    <p className="font-medium text-sm">Has Variants</p>
+                    <p className="text-xs text-muted-foreground">Enable to add size, colour & other variations</p>
                   </div>
-
-                  <div className="space-y-4">
-                    {optionFields.map((field, index) => (
-                      <Card key={field.id} className="border-dashed">
-                        <CardContent className="p-4 space-y-4">
-                          <div className="flex items-start gap-4">
-                            <div className="flex-1 space-y-4">
-                              <FormField
-                                control={form.control}
-                                name={`options.${index}.name`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Option Name</FormLabel>
-                                    <FormControl>
-                                      <Input placeholder="e.g. Color" {...field} />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={form.control}
-                                name={`options.${index}.values`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Values (Comma-separated)</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        placeholder="e.g. Red, Blue, Green"
-                                        value={Array.isArray(field.value) ? field.value.join(', ') : ''}
-                                        onChange={(e) => {
-                                          const values = e.target.value.split(',').map(v => v.trim()).filter(Boolean);
-                                          field.onChange(values);
-                                        }}
-                                      />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive mt-8"
-                              onClick={() => removeOption(index)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-
-                  {optionFields.length > 0 && (
-                    <Button
+                  <div className="flex rounded-lg border overflow-hidden">
+                    <button
                       type="button"
-                      variant="secondary"
-                      className="w-full"
-                      onClick={() => {
-                        const options = form.getValues('options');
-                        if (options) {
-                          replaceVariants(generateVariants(options));
-                        }
-                      }}
-                    >
-                      Generate Variants
-                    </Button>
-                  )}
+                      className={`px-4 py-1.5 text-sm font-medium transition-colors ${!addHasVariants ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                      onClick={() => { setAddHasVariants(false); setAddColorGroups([]); }}
+                    >OFF</button>
+                    <button
+                      type="button"
+                      className={`px-4 py-1.5 text-sm font-medium transition-colors ${addHasVariants ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                      onClick={() => setAddHasVariants(true)}
+                    >ON</button>
+                  </div>
                 </div>
 
-                {/* Generated Variants Section */}
-                {variantFields.length > 0 && (
-                  <div className="space-y-4 pt-4 border-t">
-                    <FormLabel className="text-base font-semibold">Generated Variants</FormLabel>
+                {/* ── Simple Inventory (hasVariants = false) ── */}
+                {!addHasVariants && (
+                  <>
+                    <FormField
+                      control={form.control}
+                      name="price"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Price (₹)</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="0.00" step="0.01" min="0" {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} value={field.value || 0} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="comparePrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Compare Price / MRP (₹)</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="0.00" step="0.01" min="0" {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} value={field.value || 0} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="stock"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Stock Status</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Select stock status" /></SelectTrigger></FormControl>
+                            <SelectContent>
+                              <SelectItem value="available">Available</SelectItem>
+                              <SelectItem value="unavailable">Unavailable</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="stockQuantity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Initial Stock Quantity</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="0" min="0" step="1" {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)} value={field.value || 0} />
+                          </FormControl>
+                          <FormDescription>Set the initial stock quantity for this product</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    {/* Product Images */}
                     <div className="space-y-2">
-                      {variantFields.map((field, index) => (
-                        <Card key={field.id} className="border">
-                          <CardContent className="p-4 space-y-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-medium text-sm bg-muted px-2 py-1 rounded">
-                                {Object.entries(field.optionValueNames || {})
-                                  .map(([key, val]) => `${key}: ${val}`)
-                                  .join(' / ')}
-                              </span>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="text-destructive h-8 p-0"
-                                onClick={() => removeVariant(index)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                              <FormField
-                                control={form.control}
-                                name={`variants.${index}.price`}
-                                render={({ field: { onChange, ...field } }) => (
-                                  <FormItem>
-                                    <FormLabel>Price (INR) *</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        type="number"
-                                        placeholder="e.g. 999"
-                                        {...field}
-                                        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-                                      />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={form.control}
-                                name={`variants.${index}.comparePrice`}
-                                render={({ field: { onChange, ...field } }) => (
-                                  <FormItem>
-                                    <FormLabel>Compare Price (INR)</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        type="number"
-                                        placeholder="e.g. 1499 (original)"
-                                        {...field}
-                                        value={field.value ?? ''}
-                                        onChange={(e) => onChange(e.target.value ? parseFloat(e.target.value) : null)}
-                                      />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={form.control}
-                                name={`variants.${index}.stock`}
-                                render={({ field: { onChange, ...field } }) => (
-                                  <FormItem>
-                                    <FormLabel>Stock Qty *</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        type="number"
-                                        placeholder="0"
-                                        {...field}
-                                        onChange={(e) => onChange(parseInt(e.target.value, 10) || 0)}
-                                      />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                              {/* Image selector for this variant */}
-                              <FormItem>
-                                <FormLabel>Variant Image</FormLabel>
-                                <select
-                                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                  value={(form.watch(`variants.${index}.images`) as string[] | undefined)?.[0] || ''}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    form.setValue(`variants.${index}.images`, val ? [val] : []);
-                                  }}
-                                >
-                                  <option value="">— None —</option>
-                                  {uploadedImageUrls.map((url, i) => (
-                                    <option key={i} value={url}>
-                                      Image {i + 1}
-                                    </option>
+                      <label className="text-sm font-medium">Product Images</label>
+                      <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                        {uploadedImageUrls.length > 0 && (
+                          <div className="grid grid-cols-3 gap-3 mb-3">
+                            {uploadedImageUrls.map((url, index) => (
+                              <div key={index} className="relative group">
+                                <img src={url} alt={`Product ${index + 1}`} className="h-20 w-full rounded-lg object-cover border" />
+                                <button type="button"
+                                  onClick={() => setUploadedImageUrls(prev => prev.filter((_, i) => i !== index))}
+                                  className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <label className="flex flex-col items-center gap-2 cursor-pointer">
+                          {isUploading ? (
+                            <>
+                              <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
+                              <span className="text-sm text-gray-500">Uploading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
+                                <ImageIcon className="h-6 w-6 text-gray-400" />
+                              </div>
+                              <span className="text-sm text-gray-500">{uploadedImageUrls.length > 0 ? 'Add more images' : 'Click to upload product images'}</span>
+                              <span className="text-xs text-gray-400">JPG, PNG, WEBP up to 10MB</span>
+                            </>
+                          )}
+                          <input type="file" accept="image/*" multiple className="hidden" disabled={isUploading}
+                            onChange={async (e) => {
+                              const files = Array.from(e.target.files || []);
+                              if (!files.length) return;
+                              setIsUploading(true);
+                              try {
+                                const results = await Promise.all(files.map(f => productsApi.uploadImage(f)));
+                                const urls = results.filter(r => r.success && r.data?.url).map(r => r.data!.url);
+                                if (urls.length) { setUploadedImageUrls(prev => [...prev, ...urls]); toast.success(`${urls.length} image(s) uploaded`); }
+                                else toast.error('Failed to upload images');
+                              } catch { toast.error('Failed to upload images'); }
+                              finally { setIsUploading(false); e.target.value = ''; }
+                            }} />
+                        </label>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* ── Color-Group Variant UI ── */}
+                {addHasVariants && (
+                  <div className="space-y-3 pt-2 border-t">
+                    <div className="flex items-center justify-between">
+                      <FormLabel className="text-base font-semibold">Color Variants</FormLabel>
+                      <Button type="button" variant="outline" size="sm"
+                        onClick={() => setAddColorGroups(prev => [...prev, makeColorGroup()])}>
+                        <Plus className="h-4 w-4 mr-1" /> Add Color
+                      </Button>
+                    </div>
+                    {addColorGroups.length === 0 && (
+                      <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg text-sm">
+                        No color variants yet. Click &quot;+ Add Color&quot; to begin.
+                      </div>
+                    )}
+                    <div className="space-y-4">
+                      {addColorGroups.map((cg, cgIdx) => {
+                        const totalStock = cg.sizes.reduce((s, sz) => s + (sz.stockQuantity || 0), 0);
+                        const updateCg = (patch: Partial<ColorGroup>) =>
+                          setAddColorGroups(prev => prev.map((g, i) => i === cgIdx ? { ...g, ...patch } : g));
+                        const updateSize = (sIdx: number, patch: Partial<SizeEntry>) =>
+                          setAddColorGroups(prev => prev.map((g, i) => i === cgIdx
+                            ? { ...g, sizes: g.sizes.map((s, si) => si === sIdx ? { ...s, ...patch } : s) } : g));
+                        return (
+                          <Card key={cg.id} className="border-2">
+                            <CardContent className="p-4 space-y-4">
+                              {/* Color header */}
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 flex-1">
+                                  <input type="color" className="h-9 w-9 rounded border cursor-pointer flex-shrink-0"
+                                    value={cg.colorHex}
+                                    onChange={e => updateCg({ colorHex: e.target.value })} />
+                                  <Input placeholder="Color name (e.g. Green)" className="h-9"
+                                    value={cg.color}
+                                    onChange={e => updateCg({ color: e.target.value })} />
+                                  <span className="text-xs whitespace-nowrap bg-muted px-2 py-1 rounded-full font-medium">
+                                    Total: {totalStock} pcs
+                                  </span>
+                                </div>
+                                <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive ml-2"
+                                  onClick={() => setAddColorGroups(prev => prev.filter((_, i) => i !== cgIdx))}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+
+                              {/* Color Images */}
+                              <div>
+                                <p className="text-xs font-medium mb-2">Images for {cg.color || 'this color'}</p>
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                  {cg.images.map((url, imgIdx) => (
+                                    <div key={imgIdx} className="relative group">
+                                      <img src={url} alt="" className="h-14 w-14 rounded object-cover border" />
+                                      <button type="button"
+                                        className="absolute -top-1 -right-1 p-0.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                        onClick={() => updateCg({ images: cg.images.filter((_, ii) => ii !== imgIdx) })}>
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </div>
                                   ))}
-                                </select>
-                                {/* Preview selected variant image */}
-                                {((form.watch(`variants.${index}.images`) as string[] | undefined)?.[0]) && (
-                                  <img
-                                    src={(form.watch(`variants.${index}.images`) as string[])[0]}
-                                    alt="variant"
-                                    className="mt-2 h-16 w-16 rounded object-cover border"
-                                  />
+                                  <label className="flex items-center justify-center h-14 w-14 rounded border-2 border-dashed border-muted-foreground/40 cursor-pointer hover:border-primary transition-colors">
+                                    {cg.imageUploading ? (
+                                      <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full" />
+                                    ) : (
+                                      <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                                    )}
+                                    <input type="file" accept="image/*" multiple className="hidden" disabled={cg.imageUploading}
+                                      onChange={async (e) => {
+                                        const files = Array.from(e.target.files || []);
+                                        if (!files.length) return;
+                                        updateCg({ imageUploading: true });
+                                        try {
+                                          const results = await Promise.all(files.map(f => productsApi.uploadImage(f)));
+                                          const urls = results.filter(r => r.success && r.data?.url).map(r => r.data!.url);
+                                          if (urls.length) { updateCg({ images: [...cg.images, ...urls], imageUploading: false }); toast.success(`${urls.length} image(s) uploaded`); }
+                                          else { updateCg({ imageUploading: false }); toast.error('Failed to upload images'); }
+                                        } catch { updateCg({ imageUploading: false }); toast.error('Upload failed'); }
+                                        finally { e.target.value = ''; }
+                                      }} />
+                                  </label>
+                                </div>
+                              </div>
+
+                              {/* Sizes Table */}
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <p className="text-xs font-medium">Sizes & Pricing</p>
+                                  <Button type="button" variant="outline" size="sm" className="h-7 text-xs px-2"
+                                    onClick={() => updateCg({ sizes: [...cg.sizes, { size: '', quality: '', price: 0, mrp: 0, stockQuantity: 0 }] })}>
+                                    <Plus className="h-3 w-3 mr-1" /> Add Size
+                                  </Button>
+                                </div>
+                                {cg.sizes.length > 0 && (
+                                  <div className="rounded-lg border overflow-x-auto">
+                                    <table className="w-full text-xs min-w-[500px]">
+                                      <thead className="bg-muted/60">
+                                        <tr>
+                                          <th className="py-2 px-2 text-left font-medium">Size</th>
+                                          <th className="py-2 px-2 text-left font-medium">Quality</th>
+                                          <th className="py-2 px-2 text-left font-medium">Price ₹</th>
+                                          <th className="py-2 px-2 text-left font-medium">MRP ₹</th>
+                                          <th className="py-2 px-2 text-left font-medium">Stock</th>
+                                          <th className="py-2 px-1" />
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y">
+                                        {cg.sizes.map((sz, sIdx) => (
+                                          <tr key={sIdx} className="hover:bg-muted/30">
+                                            <td className="py-1 px-2">
+                                              <Input className="h-7 text-xs min-w-[4rem]" placeholder="M / L"
+                                                value={sz.size} onChange={e => updateSize(sIdx, { size: e.target.value })} />
+                                            </td>
+                                            <td className="py-1 px-2">
+                                              <Input className="h-7 text-xs min-w-[5rem]" placeholder="Standard"
+                                                value={sz.quality} onChange={e => updateSize(sIdx, { quality: e.target.value })} />
+                                            </td>
+                                            <td className="py-1 px-2">
+                                              <Input type="number" className="h-7 text-xs min-w-[4rem]" placeholder="0"
+                                                value={sz.price || ''} onChange={e => updateSize(sIdx, { price: parseFloat(e.target.value) || 0 })} />
+                                            </td>
+                                            <td className="py-1 px-2">
+                                              <Input type="number" className="h-7 text-xs min-w-[4rem]" placeholder="0"
+                                                value={sz.mrp || ''} onChange={e => updateSize(sIdx, { mrp: parseFloat(e.target.value) || 0 })} />
+                                            </td>
+                                            <td className="py-1 px-2">
+                                              <Input type="number" className="h-7 text-xs min-w-[4rem]" placeholder="0"
+                                                value={sz.stockQuantity || ''} onChange={e => updateSize(sIdx, { stockQuantity: parseInt(e.target.value, 10) || 0 })} />
+                                            </td>
+                                            <td className="py-1 px-1">
+                                              <button type="button" className="text-destructive hover:text-red-700 p-1"
+                                                onClick={() => updateCg({ sizes: cg.sizes.filter((_, si) => si !== sIdx) })}>
+                                                <X className="h-3.5 w-3.5" />
+                                              </button>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
                                 )}
-                              </FormItem>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
 
-                {/* Image Uploader - Multiple Images */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Product Images</label>
-                  <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4">
-                    {/* Display uploaded images */}
-                    {uploadedImageUrls.length > 0 && (
-                      <div className="grid grid-cols-3 gap-3 mb-3">
-                        {uploadedImageUrls.map((url, index) => (
-                          <div key={index} className="relative group">
-                            <img
-                              src={url}
-                              alt={`Product ${index + 1}`}
-                              className="h-20 w-full rounded-lg object-cover border"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setUploadedImageUrls(prev => prev.filter((_, i) => i !== index))}
-                              className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Upload button */}
-                    <label className="flex flex-col items-center gap-2 cursor-pointer">
-                      {isUploading ? (
-                        <>
-                          <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
-                          <span className="text-sm text-gray-500">Uploading to Cloudinary...</span>
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
-                            <ImageIcon className="h-6 w-6 text-gray-400" />
-                          </div>
-                          <span className="text-sm text-gray-500">
-                            {uploadedImageUrls.length > 0 ? 'Add more images' : 'Click to upload product images'}
-                          </span>
-                          <span className="text-xs text-gray-400">JPG, PNG, WEBP up to 10MB</span>
-                        </>
-                      )}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        disabled={isUploading}
-                        onChange={async (e) => {
-                          const files = Array.from(e.target.files || []);
-                          if (files.length === 0) return;
-
-                          setIsUploading(true);
-                          try {
-                            const uploadPromises = files.map(file => productsApi.uploadImage(file));
-                            const results = await Promise.all(uploadPromises);
-
-                            const successfulUrls = results
-                              .filter(result => result.success && result.data?.url)
-                              .map(result => result.data!.url);
-
-                            if (successfulUrls.length > 0) {
-                              setUploadedImageUrls(prev => [...prev, ...successfulUrls]);
-                              toast.success(`${successfulUrls.length} image(s) uploaded successfully`);
-                            } else {
-                              toast.error('Failed to upload images');
-                            }
-                          } catch {
-                            toast.error('Failed to upload images');
-                          } finally {
-                            setIsUploading(false);
-                            e.target.value = ''; // Reset input
-                          }
-                        }}
-                      />
-                    </label>
+                {/* ── Extended Details (Optional) ── */}
+                <div className="space-y-4 pt-4 border-t">
+                  <h3 className="font-medium text-sm">Extended Details (Optional)</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={form.control} name="brand" render={({ field }) => (
+                      <FormItem><FormLabel>Brand</FormLabel><FormControl><Input placeholder="e.g. Limbu Timbu" {...field} value={field.value || ''}/></FormControl></FormItem>
+                    )} />
+                    <FormField control={form.control} name="materials" render={({ field }) => (
+                      <FormItem><FormLabel>Materials</FormLabel><FormControl><Input placeholder="e.g. Cotton Blend" {...field} value={field.value || ''}/></FormControl></FormItem>
+                    )} />
+                    <FormField control={form.control} name="care" render={({ field }) => (
+                      <FormItem className="col-span-2"><FormLabel>Care Instructions</FormLabel><FormControl><Input placeholder="e.g. Machine wash cold" {...field} value={field.value || ''}/></FormControl></FormItem>
+                    )} />
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField control={form.control} name="dimensions.l" render={({ field }) => (
+                      <FormItem><FormLabel>Length (cm)</FormLabel><FormControl><Input type="number" {...field} onChange={e=>field.onChange(parseFloat(e.target.value)||0)}/></FormControl></FormItem>
+                    )} />
+                    <FormField control={form.control} name="dimensions.w" render={({ field }) => (
+                      <FormItem><FormLabel>Width (cm)</FormLabel><FormControl><Input type="number" {...field} onChange={e=>field.onChange(parseFloat(e.target.value)||0)}/></FormControl></FormItem>
+                    )} />
+                    <FormField control={form.control} name="dimensions.h" render={({ field }) => (
+                      <FormItem><FormLabel>Height (cm)</FormLabel><FormControl><Input type="number" {...field} onChange={e=>field.onChange(parseFloat(e.target.value)||0)}/></FormControl></FormItem>
+                    )} />
+                  </div>
+                  <div className="flex gap-4">
+                     <FormField control={form.control} name="isNew" render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-2 space-y-0 rounded-md border p-3 flex-1">
+                          <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                          <FormLabel className="font-normal cursor-pointer m-0">Mark as New Arrival</FormLabel>
+                        </FormItem>
+                     )} />
+                     <FormField control={form.control} name="isBestseller" render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-2 space-y-0 rounded-md border p-3 flex-1">
+                          <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                          <FormLabel className="font-normal cursor-pointer m-0">Mark as Bestseller</FormLabel>
+                        </FormItem>
+                     )} />
                   </div>
                 </div>
+
               </div>
               <DialogFooter className="pt-4 border-t mt-auto">
                 <Button
@@ -1359,6 +1414,7 @@ export default function ProductsManagement() {
                       price: 0,
                       stock: 'available',
                       stockQuantity: 0,
+                      brand: '', care: '', materials: '', ageGroups: [], isNew: false, isBestseller: false, dimensions: { h: 0, l: 0, w: 0 }
                     });
                   }}
                   disabled={isLoading}
@@ -1390,6 +1446,7 @@ export default function ProductsManagement() {
               price: 0,
               stock: 'available',
               stockQuantity: 0,
+              brand: '', care: '', materials: '', ageGroups: [], isNew: false, isBestseller: false, dimensions: { h: 0, l: 0, w: 0 }
             });
           }
         }}
@@ -1534,381 +1591,288 @@ export default function ProductsManagement() {
                     )}
                   />
                 )}
-                <FormField
-                  control={editForm.control}
-                  name="price"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Price</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="0.00"
-                          step="0.01"
-                          min="0"
-                          {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                          value={field.value || 0}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={editForm.control}
-                  name="stock"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Stock</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select stock status" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="available">Available</SelectItem>
-                          <SelectItem value="unavailable">Unavailable</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={editForm.control}
-                  name="stockQuantity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Stock Quantity</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="0"
-                          min="0"
-                          step="1"
-                          {...field}
-                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                          value={field.value || 0}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Update the stock quantity for this product
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Product Options Section (Edit) */}
-                <div className="space-y-4 pt-4 border-t">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <FormLabel className="text-base font-semibold">Product Options</FormLabel>
-                      <p className="text-sm text-muted-foreground">Add options like Size, Color, etc. and their possible values.</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          if (!editForm.getValues('options')?.some(o => o.name.toLowerCase() === 'size')) {
-                            appendEditOption({ name: 'Size', values: [] });
-                          }
-                        }}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Size
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          if (!editForm.getValues('options')?.some(o => o.name.toLowerCase() === 'color')) {
-                            appendEditOption({ name: 'Color', values: [] });
-                          }
-                        }}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Color
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => appendEditOption({ name: '', values: [] })}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Custom Option
-                      </Button>
-                    </div>
+                {/* ── Has Variants Toggle ── */}
+                <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                  <div>
+                    <p className="font-medium text-sm">Has Variants</p>
+                    <p className="text-xs text-muted-foreground">Enable to add size, colour & other variations</p>
                   </div>
-
-                  <div className="space-y-4">
-                    {editOptionFields.map((field, index) => (
-                      <Card key={field.id} className="border-dashed">
-                        <CardContent className="p-4 space-y-4">
-                          <div className="flex items-start gap-4">
-                            <div className="flex-1 space-y-4">
-                              <FormField
-                                control={editForm.control}
-                                name={`options.${index}.name`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Option Name</FormLabel>
-                                    <FormControl>
-                                      <Input placeholder="e.g. Color" {...field} />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={editForm.control}
-                                name={`options.${index}.values`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Values (Comma-separated)</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        placeholder="e.g. Red, Blue, Green"
-                                        value={Array.isArray(field.value) ? field.value.join(', ') : ''}
-                                        onChange={(e) => {
-                                          const values = e.target.value.split(',').map(v => v.trim()).filter(Boolean);
-                                          field.onChange(values);
-                                        }}
-                                      />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive mt-8"
-                              onClick={() => removeEditOption(index)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-
-                  {editOptionFields.length > 0 && (
-                    <Button
+                  <div className="flex rounded-lg border overflow-hidden">
+                    <button
                       type="button"
-                      variant="secondary"
-                      className="w-full"
-                      onClick={() => {
-                        const options = editForm.getValues('options') || [];
-                        const generated = generateVariants(options);
-                        replaceEditVariants(generated);
-                      }}
-                    >
-                      Generate Variants
-                    </Button>
-                  )}
+                      className={`px-4 py-1.5 text-sm font-medium transition-colors ${!editHasVariants ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                      onClick={() => { setEditHasVariants(false); setEditColorGroups([]); }}
+                    >OFF</button>
+                    <button
+                      type="button"
+                      className={`px-4 py-1.5 text-sm font-medium transition-colors ${editHasVariants ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+                      onClick={() => setEditHasVariants(true)}
+                    >ON</button>
+                  </div>
                 </div>
 
-                {/* Generated Variants Section (Edit) */}
-                {editVariantFields.length > 0 && (
-                  <div className="space-y-4 pt-4 border-t">
-                    <FormLabel className="text-base font-semibold">Generated Variants</FormLabel>
+                {/* ── Simple Inventory (hasVariants = false) ── */}
+                {!editHasVariants && (
+                  <>
+                    <FormField
+                      control={editForm.control}
+                      name="price"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Price (₹)</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="0.00" step="0.01" min="0" {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} value={field.value || 0} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="comparePrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Compare Price / MRP (₹)</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="0.00" step="0.01" min="0" {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} value={field.value || 0} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="stock"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Stock Status</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Select stock status" /></SelectTrigger></FormControl>
+                            <SelectContent>
+                              <SelectItem value="available">Available</SelectItem>
+                              <SelectItem value="unavailable">Unavailable</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="stockQuantity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Stock Quantity</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="0" min="0" step="1" {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)} value={field.value || 0} />
+                          </FormControl>
+                          <FormDescription>Update the stock quantity for this product</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    {/* Product Images */}
                     <div className="space-y-2">
-                      {editVariantFields.map((field, index) => (
-                        <Card key={field.id} className="border">
-                          <CardContent className="p-4 space-y-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-medium text-sm bg-muted px-2 py-1 rounded">
-                                {Object.entries(field.optionValueNames || {})
-                                  .map(([key, val]) => `${key}: ${val}`)
-                                  .join(' / ')}
-                              </span>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="text-destructive h-8 p-0"
-                                onClick={() => removeEditVariant(index)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                              <FormField
-                                control={editForm.control}
-                                name={`variants.${index}.price`}
-                                render={({ field: { onChange, ...field } }) => (
-                                  <FormItem>
-                                    <FormLabel>Price (INR) *</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        type="number"
-                                        placeholder="e.g. 999"
-                                        {...field}
-                                        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-                                      />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={editForm.control}
-                                name={`variants.${index}.comparePrice`}
-                                render={({ field: { onChange, ...field } }) => (
-                                  <FormItem>
-                                    <FormLabel>Compare Price (INR)</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        type="number"
-                                        placeholder="e.g. 1499 (original)"
-                                        {...field}
-                                        value={field.value ?? ''}
-                                        onChange={(e) => onChange(e.target.value ? parseFloat(e.target.value) : null)}
-                                      />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={editForm.control}
-                                name={`variants.${index}.stock`}
-                                render={({ field: { onChange, ...field } }) => (
-                                  <FormItem>
-                                    <FormLabel>Stock Qty *</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        type="number"
-                                        placeholder="0"
-                                        {...field}
-                                        onChange={(e) => onChange(parseInt(e.target.value, 10) || 0)}
-                                      />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                              {/* Image selector for this variant */}
-                              <FormItem>
-                                <FormLabel>Variant Image</FormLabel>
-                                <select
-                                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                  value={(editForm.watch(`variants.${index}.images`) as string[] | undefined)?.[0] || ''}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    editForm.setValue(`variants.${index}.images`, val ? [val] : []);
-                                  }}
-                                >
-                                  <option value="">— None —</option>
-                                  {/* show newly uploaded images first, then existing product images */}
-                                  {[...editUploadedImageUrls, ...(editingProduct?.images || [])].filter((u, i, arr) => arr.indexOf(u) === i).map((url, i) => (
-                                    <option key={i} value={url}>
-                                      Image {i + 1}
-                                    </option>
+                      <label className="text-sm font-medium">Product Images</label>
+                      <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                        {editUploadedImageUrls.length > 0 && (
+                          <div className="grid grid-cols-3 gap-3 mb-3">
+                            {editUploadedImageUrls.map((url, index) => (
+                              <div key={index} className="relative group">
+                                <img src={url} alt={`Product ${index + 1}`} className="h-20 w-full rounded-lg object-cover border" />
+                                <button type="button"
+                                  onClick={() => setEditUploadedImageUrls(prev => prev.filter((_, i) => i !== index))}
+                                  className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <label className="flex flex-col items-center gap-2 cursor-pointer">
+                          {isEditUploading ? (
+                            <>
+                              <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
+                              <span className="text-sm text-gray-500">Uploading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
+                                <ImageIcon className="h-6 w-6 text-gray-400" />
+                              </div>
+                              <span className="text-sm text-gray-500">{editUploadedImageUrls.length > 0 ? 'Add more images' : 'Click to upload product images'}</span>
+                              <span className="text-xs text-gray-400">JPG, PNG, WEBP up to 10MB</span>
+                            </>
+                          )}
+                          <input type="file" accept="image/*" multiple className="hidden" disabled={isEditUploading}
+                            onChange={async (e) => {
+                              const files = Array.from(e.target.files || []);
+                              if (!files.length) return;
+                              setIsEditUploading(true);
+                              try {
+                                const results = await Promise.all(files.map(f => productsApi.uploadImage(f)));
+                                const urls = results.filter(r => r.success && r.data?.url).map(r => r.data!.url);
+                                if (urls.length) { setEditUploadedImageUrls(prev => [...prev, ...urls]); toast.success(`${urls.length} image(s) uploaded`); }
+                                else toast.error('Failed to upload images');
+                              } catch { toast.error('Failed to upload images'); }
+                              finally { setIsEditUploading(false); e.target.value = ''; }
+                            }} />
+                        </label>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* ── Color-Group Variant UI (Edit) ── */}
+                {editHasVariants && (
+                  <div className="space-y-3 pt-2 border-t">
+                    <div className="flex items-center justify-between">
+                      <FormLabel className="text-base font-semibold">Color Variants</FormLabel>
+                      <Button type="button" variant="outline" size="sm"
+                        onClick={() => setEditColorGroups(prev => [...prev, makeColorGroup()])}>
+                        <Plus className="h-4 w-4 mr-1" /> Add Color
+                      </Button>
+                    </div>
+                    {editColorGroups.length === 0 && (
+                      <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg text-sm">
+                        No color variants yet. Click &quot;+ Add Color&quot; to begin.
+                      </div>
+                    )}
+                    <div className="space-y-4">
+                      {editColorGroups.map((cg, cgIdx) => {
+                        const totalStock = cg.sizes.reduce((s, sz) => s + (sz.stockQuantity || 0), 0);
+                        const updateCg = (patch: Partial<ColorGroup>) =>
+                          setEditColorGroups(prev => prev.map((g, i) => i === cgIdx ? { ...g, ...patch } : g));
+                        const updateSize = (sIdx: number, patch: Partial<SizeEntry>) =>
+                          setEditColorGroups(prev => prev.map((g, i) => i === cgIdx
+                            ? { ...g, sizes: g.sizes.map((s, si) => si === sIdx ? { ...s, ...patch } : s) } : g));
+                        return (
+                          <Card key={cg.id} className="border-2">
+                            <CardContent className="p-4 space-y-4">
+                              {/* Color header */}
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 flex-1">
+                                  <input type="color" className="h-9 w-9 rounded border cursor-pointer flex-shrink-0"
+                                    value={cg.colorHex}
+                                    onChange={e => updateCg({ colorHex: e.target.value })} />
+                                  <Input placeholder="Color name (e.g. Green)" className="h-9"
+                                    value={cg.color}
+                                    onChange={e => updateCg({ color: e.target.value })} />
+                                  <span className="text-xs whitespace-nowrap bg-muted px-2 py-1 rounded-full font-medium">
+                                    Total: {totalStock} pcs
+                                  </span>
+                                </div>
+                                <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive ml-2"
+                                  onClick={() => setEditColorGroups(prev => prev.filter((_, i) => i !== cgIdx))}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+
+                              {/* Color Images */}
+                              <div>
+                                <p className="text-xs font-medium mb-2">Images for {cg.color || 'this color'}</p>
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                  {cg.images.map((url, imgIdx) => (
+                                    <div key={imgIdx} className="relative group">
+                                      <img src={url} alt="" className="h-14 w-14 rounded object-cover border" />
+                                      <button type="button"
+                                        className="absolute -top-1 -right-1 p-0.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                        onClick={() => updateCg({ images: cg.images.filter((_, ii) => ii !== imgIdx) })}>
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </div>
                                   ))}
-                                </select>
-                                {/* Preview */}
-                                {((editForm.watch(`variants.${index}.images`) as string[] | undefined)?.[0]) && (
-                                  <img
-                                    src={(editForm.watch(`variants.${index}.images`) as string[])[0]}
-                                    alt="variant"
-                                    className="mt-2 h-16 w-16 rounded object-cover border"
-                                  />
+                                  <label className="flex items-center justify-center h-14 w-14 rounded border-2 border-dashed border-muted-foreground/40 cursor-pointer hover:border-primary transition-colors">
+                                    {cg.imageUploading ? (
+                                      <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full" />
+                                    ) : (
+                                      <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                                    )}
+                                    <input type="file" accept="image/*" multiple className="hidden" disabled={cg.imageUploading}
+                                      onChange={async (e) => {
+                                        const files = Array.from(e.target.files || []);
+                                        if (!files.length) return;
+                                        updateCg({ imageUploading: true });
+                                        try {
+                                          const results = await Promise.all(files.map(f => productsApi.uploadImage(f)));
+                                          const urls = results.filter(r => r.success && r.data?.url).map(r => r.data!.url);
+                                          if (urls.length) { updateCg({ images: [...cg.images, ...urls], imageUploading: false }); toast.success(`${urls.length} image(s) uploaded`); }
+                                          else { updateCg({ imageUploading: false }); toast.error('Failed to upload images'); }
+                                        } catch { updateCg({ imageUploading: false }); toast.error('Upload failed'); }
+                                        finally { e.target.value = ''; }
+                                      }} />
+                                  </label>
+                                </div>
+                              </div>
+
+                              {/* Sizes Table */}
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <p className="text-xs font-medium">Sizes & Pricing</p>
+                                  <Button type="button" variant="outline" size="sm" className="h-7 text-xs px-2"
+                                    onClick={() => updateCg({ sizes: [...cg.sizes, { size: '', quality: '', price: 0, mrp: 0, stockQuantity: 0 }] })}>
+                                    <Plus className="h-3 w-3 mr-1" /> Add Size
+                                  </Button>
+                                </div>
+                                {cg.sizes.length > 0 && (
+                                  <div className="rounded-lg border overflow-x-auto">
+                                    <table className="w-full text-xs min-w-[500px]">
+                                      <thead className="bg-muted/60">
+                                        <tr>
+                                          <th className="py-2 px-2 text-left font-medium">Size</th>
+                                          <th className="py-2 px-2 text-left font-medium">Quality</th>
+                                          <th className="py-2 px-2 text-left font-medium">Price ₹</th>
+                                          <th className="py-2 px-2 text-left font-medium">MRP ₹</th>
+                                          <th className="py-2 px-2 text-left font-medium">Stock</th>
+                                          <th className="py-2 px-1" />
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y">
+                                        {cg.sizes.map((sz, sIdx) => (
+                                          <tr key={sIdx} className="hover:bg-muted/30">
+                                            <td className="py-1 px-2">
+                                              <Input className="h-7 text-xs min-w-[4rem]" placeholder="M / L"
+                                                value={sz.size} onChange={e => updateSize(sIdx, { size: e.target.value })} />
+                                            </td>
+                                            <td className="py-1 px-2">
+                                              <Input className="h-7 text-xs min-w-[5rem]" placeholder="Standard"
+                                                value={sz.quality} onChange={e => updateSize(sIdx, { quality: e.target.value })} />
+                                            </td>
+                                            <td className="py-1 px-2">
+                                              <Input type="number" className="h-7 text-xs min-w-[4rem]" placeholder="0"
+                                                value={sz.price || ''} onChange={e => updateSize(sIdx, { price: parseFloat(e.target.value) || 0 })} />
+                                            </td>
+                                            <td className="py-1 px-2">
+                                              <Input type="number" className="h-7 text-xs min-w-[4rem]" placeholder="0"
+                                                value={sz.mrp || ''} onChange={e => updateSize(sIdx, { mrp: parseFloat(e.target.value) || 0 })} />
+                                            </td>
+                                            <td className="py-1 px-2">
+                                              <Input type="number" className="h-7 text-xs min-w-[4rem]" placeholder="0"
+                                                value={sz.stockQuantity || ''} onChange={e => updateSize(sIdx, { stockQuantity: parseInt(e.target.value, 10) || 0 })} />
+                                            </td>
+                                            <td className="py-1 px-1">
+                                              <button type="button" className="text-destructive hover:text-red-700 p-1"
+                                                onClick={() => updateCg({ sizes: cg.sizes.filter((_, si) => si !== sIdx) })}>
+                                                <X className="h-3.5 w-3.5" />
+                                              </button>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
                                 )}
-                              </FormItem>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
-
-                {/* Image Uploader - Multiple Images */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Product Images</label>
-                  <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4">
-                    {/* Display uploaded images */}
-                    {editUploadedImageUrls.length > 0 && (
-                      <div className="grid grid-cols-3 gap-3 mb-3">
-                        {editUploadedImageUrls.map((url, index) => (
-                          <div key={index} className="relative group">
-                            <img
-                              src={url}
-                              alt={`Product ${index + 1}`}
-                              className="h-20 w-full rounded-lg object-cover border"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setEditUploadedImageUrls(prev => prev.filter((_, i) => i !== index))}
-                              className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Upload button */}
-                    <label className="flex flex-col items-center gap-2 cursor-pointer">
-                      {isEditUploading ? (
-                        <>
-                          <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
-                          <span className="text-sm text-gray-500">Uploading to Cloudinary...</span>
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
-                            <ImageIcon className="h-6 w-6 text-gray-400" />
-                          </div>
-                          <span className="text-sm text-gray-500">
-                            {editUploadedImageUrls.length > 0 ? 'Add more images' : 'Click to upload product images'}
-                          </span>
-                          <span className="text-xs text-gray-400">JPG, PNG, WEBP up to 10MB</span>
-                        </>
-                      )}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        disabled={isEditUploading}
-                        onChange={async (e) => {
-                          const files = Array.from(e.target.files || []);
-                          if (files.length === 0) return;
-
-                          setIsEditUploading(true);
-                          try {
-                            const uploadPromises = files.map(file => productsApi.uploadImage(file));
-                            const results = await Promise.all(uploadPromises);
-
-                            const successfulUrls = results
-                              .filter(result => result.success && result.data?.url)
-                              .map(result => result.data!.url);
-
-                            if (successfulUrls.length > 0) {
-                              setEditUploadedImageUrls(prev => [...prev, ...successfulUrls]);
-                              toast.success(`${successfulUrls.length} image(s) uploaded successfully`);
-                            } else {
-                              toast.error('Failed to upload images');
-                            }
-                          } catch {
-                            toast.error('Failed to upload images');
-                          } finally {
-                            setIsEditUploading(false);
-                            e.target.value = ''; // Reset input
-                          }
-                        }}
-                      />
-                    </label>
-                  </div>
-                </div>
               </div>
               <DialogFooter className="pt-4 border-t mt-auto">
 
@@ -1952,7 +1916,7 @@ export default function ProductsManagement() {
           <DialogHeader>
             <DialogTitle>Delete Product</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{deletingProduct?.name}"? This action cannot be undone.
+              Are you sure you want to delete this product? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1983,7 +1947,10 @@ export default function ProductsManagement() {
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Product Details</DialogTitle>
+            <DialogTitle>View Product Details</DialogTitle>
+            <DialogDescription>
+              Detailed information about the selected product.
+            </DialogDescription>
           </DialogHeader>
           {selectedProduct && (
             <div className="space-y-6">
@@ -2061,6 +2028,9 @@ export default function ProductsManagement() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Quick Add Subcategory</DialogTitle>
+            <DialogDescription>
+              Create a new subcategory instantly for the selected category.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">

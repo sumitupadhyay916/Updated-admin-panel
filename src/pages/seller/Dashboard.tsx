@@ -10,7 +10,7 @@ import { dashboardApi, sellersApi } from '@/services/api';
 import type { Order } from '@/types';
 import {
   ShoppingBag, Package, TrendingUp, ArrowRight,
-  Store, IndianRupee, Wallet, Star, Clock, CheckCircle,
+  Store, IndianRupee, Star, CheckCircle,
 } from 'lucide-react';
 import {
   LineChart, Line, BarChart, Bar,

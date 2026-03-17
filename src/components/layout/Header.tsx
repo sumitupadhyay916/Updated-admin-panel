@@ -4,7 +4,7 @@ import { useThemeStore } from '@/store/themeStore';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+// import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,7 +14,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Bell,
   Search,
   Sun,
   Moon,
@@ -35,14 +34,7 @@ export function Header({ className, title, showSearch = true }: HeaderProps) {
   const { user, logout } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
 
-  // Mock notifications
-  const notifications = [
-    { id: 1, message: 'New order received #DM-2024-0005', time: '5 min ago', unread: true },
-    { id: 2, message: 'Low stock alert: Brass Ganesha Idol', time: '1 hour ago', unread: true },
-    { id: 3, message: 'Payout processed successfully', time: '2 hours ago', unread: false },
-  ];
-
-  const unreadCount = notifications.filter(n => n.unread).length;
+  // No active notifications
 
   return (
     <header
