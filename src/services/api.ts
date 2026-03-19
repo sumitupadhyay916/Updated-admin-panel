@@ -114,6 +114,11 @@ export const authApi = {
     return response.data;
   },
 
+  updateProfile: async (data: { name?: string; phone?: string; avatar?: string }): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.put('/auth/profile', data);
+    return response.data;
+  },
+
   changePassword: async (data: ChangePasswordRequest): Promise<ApiResponse<null>> => {
     const response = await apiClient.post('/auth/change-password', data);
     return response.data;

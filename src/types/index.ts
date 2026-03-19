@@ -77,11 +77,11 @@ export interface Address {
 // PRODUCT TYPES
 // ============================================
 
-export type Deity = 'Ganesh' | 'Krishna' | 'Shiva' | 'Durga' | 'Lakshmi' | 'Saraswati' | 'Hanuman' | 'Ram' | 'Vishnu' | 'Kali' | 'Other';
+// export type Deity = 'Ganesh' | 'Krishna' | 'Shiva' | 'Durga' | 'Lakshmi' | 'Saraswati' | 'Hanuman' | 'Ram' | 'Vishnu' | 'Kali' | 'Other';
 export type Material = 'Brass' | 'Marble' | 'Resin' | 'Clay' | 'Silver' | 'Wood' | 'Gold' | 'Panchdhatu' | 'Copper';
-export type ReligionCategory = 'Hindu' | 'Buddhist' | 'Jain' | 'Sikh' | 'Universal';
-export type PackagingType = 'Box' | 'Velvet Box' | 'Wooden Case' | 'Gift Wrap' | 'Standard';
-export type Occasion = 'Diwali' | 'Puja' | 'Wedding' | 'Festival' | 'Housewarming' | 'Birthday' | 'Anniversary' | 'Corporate' | 'Daily Worship' | 'Tuesday Special' | 'Navratri' | 'Ganesh Chaturthi' | 'Vasant Panchami';
+// export type ReligionCategory = 'Hindu' | 'Buddhist' | 'Jain' | 'Sikh' | 'Universal';
+// export type PackagingType = 'Box' | 'Velvet Box' | 'Wooden Case' | 'Gift Wrap' | 'Standard';
+// export type Occasion = 'Diwali' | 'Puja' | 'Wedding' | 'Festival' | 'Housewarming' | 'Birthday' | 'Anniversary' | 'Corporate' | 'Daily Worship' | 'Tuesday Special' | 'Navratri' | 'Ganesh Chaturthi' | 'Vasant Panchami';
 
 export interface Category {
   id: number;
@@ -93,6 +93,10 @@ export interface Category {
   status: 'active' | 'inactive';
   noOfProducts: number;
   productCount: number;
+  createdBy?: {
+    name: string;
+    email: string;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -102,15 +106,15 @@ export interface Product {
   pid: string;
   name: string;
   description: string;
-  deity: Deity;
+  // deity: Deity;
   material: Material;
   height: number;
   weight: number;
   handcrafted: boolean;
-  occasion: Occasion[];
-  religionCategory: ReligionCategory;
-  packagingType: PackagingType;
-  fragile: boolean;
+  // occasion: Occasion[];
+  // religionCategory: ReligionCategory;
+  // packagingType: PackagingType;
+  // fragile: boolean;
   price: number;
   comparePrice?: number;
   stock: 'available' | 'unavailable';
@@ -191,15 +195,18 @@ export interface OrderItem {
   productId: string;
   productName: string;
   productImage: string;
-  deity: Deity;
+  // deity: Deity;
   material: Material;
   height: number;
   weight: number;
-  packagingType: PackagingType;
-  fragile: boolean;
+  // packagingType: PackagingType;
+  //fragile: boolean;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  variantId?: string;
+  color?: string;
+  size?: string;
   sellerId: string;
   sellerName: string;
 }

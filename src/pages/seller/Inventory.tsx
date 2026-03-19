@@ -91,6 +91,8 @@ interface Product {
   deliveredQuantity?: number;
   reservedQuantity?: number;
   shippingQuantity?: number;
+  hasVariants?: boolean;
+  variants?: any[];
 }
 
 interface PaginationMeta {
@@ -112,9 +114,6 @@ const STOCK_STATUS_CONFIG: Record<
   unavailable: { label: 'Out of Stock', variant: 'destructive' },
 };
 
-function fmt(amount: number) {
-  return `₹${amount.toLocaleString('en-IN')}`;
-}
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', {
@@ -413,7 +412,6 @@ export default function SellerInventory() {
                     <TableRow>
                       <TableHead>Product</TableHead>
                       <TableHead>Category</TableHead>
-                      <TableHead>Price</TableHead>
                       <TableHead>Total Stock</TableHead>
                       <TableHead>Available</TableHead>
                       <TableHead>Reserved</TableHead>
@@ -450,16 +448,6 @@ export default function SellerInventory() {
                             </div>
                           </TableCell>
                           <TableCell>{product.categoryName}</TableCell>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">{fmt(product.price)}</p>
-                              {product.comparePrice && (
-                                <p className="text-xs text-muted-foreground line-through">
-                                  {fmt(product.comparePrice)}
-                                </p>
-                              )}
-                            </div>
-                          </TableCell>
                           <TableCell>
                             <span className="font-medium">{product.totalStock ?? product.stockQuantity ?? 0}</span>
                           </TableCell>
