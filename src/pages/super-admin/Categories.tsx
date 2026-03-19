@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { categoriesApi, productsApi } from '@/services/api';
+import { useRole } from '@/store/authStore';
 import type { Category } from '@/types';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useForm } from 'react-hook-form';
@@ -250,101 +251,128 @@ export default function Categories() {
     setIsDeleteDialogOpen(true);
   };
 
+  const { isSuperAdmin } = useRole();
+
   const columns: ColumnDef<Category>[] = useMemo(
-    () => [
-      {
-        accessorKey: 'id',
-        header: 'ID',
-        cell: ({ row }) => <div className="font-medium">{row.getValue('id')}</div>,
-      },
-      {
-        accessorKey: 'cid',
-        header: 'CID',
-        cell: ({ row }) => {
-          const cid = row.original.cid || row.original.id;
-          return <div className="font-mono text-xs text-muted-foreground">{cid}</div>;
+    () => {
+      const cols: ColumnDef<Category>[] = [
+        {
+          accessorKey: 'id',
+          header: 'ID',
+          cell: ({ row }) => <div className="font-medium">{row.getValue('id')}</div>,
         },
-      },
-      {
-        accessorKey: 'imageUrl',
-        header: 'Image',
-        cell: ({ row }) => {
-          const imageUrl = row.getValue('imageUrl') as string;
-          return (
-            <div className="w-10 h-10 rounded-md overflow-hidden border bg-muted">
-              {imageUrl ? (
-                <img
-                  src={imageUrl}
-                  alt={row.getValue('name')}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <ImageIcon className="w-4 h-4 text-muted-foreground opacity-50" />
-                </div>
-              )}
-            </div>
-          );
+        {
+          accessorKey: 'cid',
+          header: 'CID',
+          cell: ({ row }) => {
+            const cid = row.original.cid || row.original.id;
+            return <div className="font-mono text-xs text-muted-foreground">{cid}</div>;
+          },
         },
-      },
-      {
-        accessorKey: 'name',
-        header: 'Name',
-        cell: ({ row }) => <div className="font-medium">{row.getValue('name')}</div>,
-      },
-      {
-        accessorKey: 'noOfProducts',
-        header: 'No. of Products',
-        cell: ({ row }) => {
-          const count = row.getValue('noOfProducts') as number;
-          return (
-            <div className="text-blue-600 font-medium">{count}</div>
-          );
+        {
+          accessorKey: 'imageUrl',
+          header: 'Image',
+          cell: ({ row }) => {
+            const imageUrl = row.getValue('imageUrl') as string;
+            return (
+              <div className="w-10 h-10 rounded-md overflow-hidden border bg-muted">
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt={row.getValue('name')}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <ImageIcon className="w-4 h-4 text-muted-foreground opacity-50" />
+                  </div>
+                )}
+              </div>
+            );
+          },
         },
-      },
-      {
-        accessorKey: 'createdAt',
-        header: 'Created',
-        cell: ({ row }) => {
-          const date = new Date(row.getValue('createdAt'));
-          return <div>{date.toLocaleDateString('en-GB')} {date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</div>;
+        {
+          accessorKey: 'name',
+          header: 'Name',
+          cell: ({ row }) => <div className="font-medium">{row.getValue('name')}</div>,
         },
-      },
-      {
-        accessorKey: 'updatedAt',
-        header: 'Updated',
-        cell: ({ row }) => {
-          const date = new Date(row.getValue('updatedAt'));
-          return <div>{date.toLocaleDateString('en-GB')} {date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</div>;
+        {
+          accessorKey: 'noOfProducts',
+          header: 'No. of Products',
+          cell: ({ row }) => {
+            const count = row.getValue('noOfProducts') as number;
+            return (
+              <div className="text-blue-600 font-medium">{count}</div>
+            );
+          },
         },
-      },
-      {
-        id: 'actions',
-        header: '',
-        cell: ({ row }) => {
-          const category = row.original;
-          return (
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => openEditDialog(category)}
-              >
-                <Edit2 className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => openDeleteDialog(category)}
-              >
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
-            </div>
-          );
+      ];
+
+      // Add "Created By" column only for super admins
+      if (isSuperAdmin) {
+        cols.push({
+          accessorKey: 'createdBy',
+          header: 'Created By',
+          cell: ({ row }) => {
+            const createdBy = row.original.createdBy;
+            if (!createdBy) return <div className="text-muted-foreground text-xs">System / Unknown</div>;
+            return (
+              <div className="flex flex-col">
+                <span className="font-semibold text-sm">{createdBy.name}</span>
+                <span className="text-xs text-muted-foreground">{createdBy.email}</span>
+              </div>
+            );
+          },
+        });
+      }
+
+      cols.push(
+        {
+          accessorKey: 'createdAt',
+          header: 'Created',
+          cell: ({ row }) => {
+            const date = new Date(row.getValue('createdAt'));
+            return <div>{date.toLocaleDateString('en-GB')} {date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</div>;
+          },
         },
-      },
-    ],
-    [],
+        {
+          accessorKey: 'updatedAt',
+          header: 'Updated',
+          cell: ({ row }) => {
+            const date = new Date(row.getValue('updatedAt'));
+            return <div>{date.toLocaleDateString('en-GB')} {date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</div>;
+          },
+        },
+        {
+          id: 'actions',
+          header: '',
+          cell: ({ row }) => {
+            const category = row.original;
+            return (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => openEditDialog(category)}
+                >
+                  <Edit2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => openDeleteDialog(category)}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            );
+          },
+        }
+      );
+
+      return cols;
+    },
+    [isSuperAdmin],
   );
 
 

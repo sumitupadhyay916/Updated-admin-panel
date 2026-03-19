@@ -114,6 +114,11 @@ export const authApi = {
     return response.data;
   },
 
+  updateProfile: async (data: { name?: string; phone?: string; avatar?: string }): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.put('/auth/profile', data);
+    return response.data;
+  },
+
   changePassword: async (data: ChangePasswordRequest): Promise<ApiResponse<null>> => {
     const response = await apiClient.post('/auth/change-password', data);
     return response.data;
@@ -122,6 +127,16 @@ export const authApi = {
   logout: () => {
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('auth-storage');
+  },
+
+  activateSeller: async (data: { token: string; password: string }): Promise<ApiResponse<null>> => {
+    const response = await apiClient.post('/auth/activate-seller', data);
+    return response.data;
+  },
+
+  verifyActivationToken: async (token: string): Promise<ApiResponse<{ email: string; name: string }>> => {
+    const response = await apiClient.get('/auth/verify-activation-token', { params: { token } });
+    return response.data;
   },
 };
 
@@ -183,7 +198,7 @@ export const usersApi = {
 
 export interface CreateSellerRequest {
   email: string;
-  password: string;
+  password?: string;
   name: string;
   phone?: string;
   businessName: string;

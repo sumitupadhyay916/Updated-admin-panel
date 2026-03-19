@@ -19,8 +19,11 @@ import {
   Edit2,
   Trash2,
   ImageIcon,
+  Check,
   X,
 } from 'lucide-react';
+
+import { ViewProductModal } from '@/components/inventory/ViewProductModal';
 
 import {
   Form,
@@ -591,13 +594,7 @@ export default function ProductsManagement() {
     }
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
+
 
   const handleQuickCreateSubcategory = async () => {
     const catId = isAddDialogOpen ? form.getValues('categoryId') : editForm.getValues('categoryId');
@@ -672,14 +669,25 @@ export default function ProductsManagement() {
         header: 'Products',
         cell: ({ row }: { row: { original: Product } }) => {
           const product = row.original;
+          // Find first available image: main product image or first variant image
+          const displayImage = (product.images && product.images.length > 0)
+            ? product.images[0]
+            : (product.variants && product.variants.length > 0 && product.variants[0].images && product.variants[0].images.length > 0)
+              ? product.variants[0].images[0]
+              : null;
+
           return (
             <div className="flex items-center gap-3">
-              {product.images && product.images.length > 0 && (
+              {displayImage ? (
                 <img
-                  src={product.images[0]}
+                  src={displayImage}
                   alt={product.name}
                   className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
                 />
+              ) : (
+                <div className="h-12 w-12 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
+                  <ImageIcon className="h-6 w-6 text-gray-400" />
+                </div>
               )}
               <div className="min-w-0 flex-1">
                 <p className="font-medium text-gray-900 dark:text-white truncate max-w-[200px]" title={product.name}>
@@ -716,20 +724,24 @@ export default function ProductsManagement() {
         },
       },
       {
-        accessorKey: 'price',
-        header: 'Price',
-        cell: ({ row }: { row: { original: Product } }) => (
-          <div>
-            <p className="font-medium text-gray-900 dark:text-white">
-              {formatCurrency(row.original.price)}
-            </p>
-            {row.original.comparePrice && (
-              <p className="text-xs text-gray-500 line-through">
-                {formatCurrency(row.original.comparePrice)}
-              </p>
-            )}
-          </div>
-        ),
+        accessorKey: 'hasVariants',
+        header: 'hasVariants',
+        cell: ({ row }: { row: { original: Product } }) => {
+          const hasVariants = (row.original as any).hasVariants;
+          return (
+            <div className="flex justify-center w-full max-w-[80px]">
+              {hasVariants ? (
+                <div className="p-1.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
+                  <Check className="h-4 w-4" />
+                </div>
+              ) : (
+                <div className="p-1.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
+                  <X className="h-4 w-4" />
+                </div>
+              )}
+            </div>
+          );
+        },
       },
       {
         accessorKey: 'stock',
@@ -1084,7 +1096,7 @@ export default function ProductsManagement() {
                     <button
                       type="button"
                       className={`px-4 py-1.5 text-sm font-medium transition-colors ${!addHasVariants ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
-                      onClick={() => { setAddHasVariants(false); setAddColorGroups([]); }}
+                      onClick={() => setAddHasVariants(false)}
                     >OFF</button>
                     <button
                       type="button"
@@ -1601,7 +1613,7 @@ export default function ProductsManagement() {
                     <button
                       type="button"
                       className={`px-4 py-1.5 text-sm font-medium transition-colors ${!editHasVariants ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
-                      onClick={() => { setEditHasVariants(false); setEditColorGroups([]); }}
+                      onClick={() => setEditHasVariants(false)}
                     >OFF</button>
                     <button
                       type="button"
@@ -1943,85 +1955,11 @@ export default function ProductsManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* View Product Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>View Product Details</DialogTitle>
-            <DialogDescription>
-              Detailed information about the selected product.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedProduct && (
-            <div className="space-y-6">
-              <div className="flex gap-4">
-                {selectedProduct.images && selectedProduct.images.length > 0 && (
-                  <img
-                    src={selectedProduct.images[0]}
-                    alt={selectedProduct.name}
-                    className="h-40 w-40 rounded-lg object-cover"
-                  />
-                )}
-                <div className="flex-1">
-                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                    {selectedProduct.name}
-                  </h3>
-                  <p className="text-gray-600 dark:text-gray-400 mt-1">{selectedProduct.sellerName}</p>
-                  <p className="text-gray-600 dark:text-gray-400 mt-1">Category: {selectedProduct.categoryName || 'Uncategorized'}</p>
-                  <div className="flex gap-2 mt-2">
-                    <Badge variant={selectedProduct.stock === 'available' ? 'default' : 'secondary'}>
-                      {selectedProduct.stock === 'available' ? 'Available' : 'Unavailable'}
-                    </Badge>
-                    {selectedProduct.isFeatured && (
-                      <Badge variant="secondary">
-                        Featured
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-2xl font-bold text-orange-600 mt-3">
-                    {formatCurrency(selectedProduct.price)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-700">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Deity</p>
-                  <p className="font-medium text-gray-900 dark:text-white">{selectedProduct.deity}</p>
-                </div>
-                <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-700">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Material</p>
-                  <p className="font-medium text-gray-900 dark:text-white">{selectedProduct.material}</p>
-                </div>
-                <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-700">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Dimensions</p>
-                  <p className="font-medium text-gray-900 dark:text-white">
-                    {selectedProduct.height}" H × {selectedProduct.weight}g
-                  </p>
-                </div>
-                <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-700">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Packaging</p>
-                  <p className="font-medium text-gray-900 dark:text-white">{selectedProduct.packagingType}</p>
-                </div>
-              </div>
-
-              {selectedProduct.description && (
-                <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-700">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Description</p>
-                  <p className="text-gray-900 dark:text-white mt-1">{selectedProduct.description}</p>
-                </div>
-              )}
-
-              <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-700">
-                <p className="text-sm text-gray-600 dark:text-gray-400">Created At</p>
-                <p className="font-medium text-gray-900 dark:text-white">
-                  {new Date(selectedProduct.createdAt).toLocaleString()}
-                </p>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <ViewProductModal
+        product={selectedProduct as any}
+        open={isViewDialogOpen}
+        onClose={() => setIsViewDialogOpen(false)}
+      />
 
       {/* Quick Add Subcategory Dialog */}
       <Dialog open={isQuickAddSubcategoryOpen} onOpenChange={setIsQuickAddSubcategoryOpen}>

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import { useRole } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -32,7 +33,14 @@ interface HeaderProps {
 
 export function Header({ className, title, showSearch = true }: HeaderProps) {
   const { user, logout } = useAuthStore();
+  const { isSuperAdmin, isAdmin } = useRole();
   const { theme, toggleTheme } = useThemeStore();
+
+  const profileUrl = isSuperAdmin
+    ? '/super-admin/profile'
+    : isAdmin
+    ? '/admin/profile'
+    : '/seller/profile';
 
   // No active notifications
 
@@ -137,7 +145,7 @@ export function Header({ className, title, showSearch = true }: HeaderProps) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link to="/profile" className="flex items-center gap-2 cursor-pointer">
+              <Link to={profileUrl} className="flex items-center gap-2 cursor-pointer">
                 <User className="h-4 w-4" />
                 Profile
               </Link>
