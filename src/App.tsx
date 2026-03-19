@@ -6,6 +6,7 @@ import { Toaster } from '@/components/ui/sonner';
 
 // Auth Pages
 import Login from '@/pages/auth/Login';
+import ActivateSeller from '@/pages/auth/ActivateSeller';
 
 // Super Admin Pages
 import SuperAdminDashboard from '@/pages/super-admin/Dashboard';
@@ -113,6 +114,14 @@ function App() {
             element={
               <PublicRoute>
                 <Login />
+              </PublicRoute>
+            } 
+          />
+          <Route 
+            path="/activate-seller" 
+            element={
+              <PublicRoute>
+                <ActivateSeller />
               </PublicRoute>
             } 
           />

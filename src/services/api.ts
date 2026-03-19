@@ -123,6 +123,16 @@ export const authApi = {
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('auth-storage');
   },
+
+  activateSeller: async (data: { token: string; password: string }): Promise<ApiResponse<null>> => {
+    const response = await apiClient.post('/auth/activate-seller', data);
+    return response.data;
+  },
+
+  verifyActivationToken: async (token: string): Promise<ApiResponse<{ email: string; name: string }>> => {
+    const response = await apiClient.get('/auth/verify-activation-token', { params: { token } });
+    return response.data;
+  },
 };
 
 // ============================================
@@ -183,7 +193,7 @@ export const usersApi = {
 
 export interface CreateSellerRequest {
   email: string;
-  password: string;
+  password?: string;
   name: string;
   phone?: string;
   businessName: string;
