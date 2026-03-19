@@ -8,6 +8,26 @@ import {
 } from '@/components/ui/dialog';
 import { Calendar, ShoppingCart, Truck, CheckCircle } from 'lucide-react';
 
+interface VariantOptionValueMapping {
+  optionId: string;
+  optionName: string;
+  valueId: string;
+  value: string;
+}
+
+interface ProductVariant {
+  id: string;
+  sku?: string;
+  size?: string;
+  color?: string;
+  price: number;
+  comparePrice?: number;
+  mrp?: number;
+  stock: number;
+  stockQuantity?: number;
+  optionValues: VariantOptionValueMapping[];
+}
+
 interface Product {
   id: number;
   pid: string;
@@ -21,11 +41,14 @@ interface Product {
   price: number;
   comparePrice?: number;
   stock: 'available' | 'unavailable';
+  stockQuantity: number;
   lowStockThreshold: number;
   images: string[];
   sellerName: string;
   isFeatured: boolean;
   tags: string[];
+  hasVariants?: boolean;
+  variants?: ProductVariant[];
   createdAt: string;
   updatedAt: string;
   deliveredQuantity?: number;
@@ -101,21 +124,63 @@ export function ViewProductModal({ product, open, onClose }: ViewProductModalPro
             </div>
 
             <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">Price</h3>
-              <div className="flex items-center gap-2">
-                <p className="text-lg font-semibold">{fmt(product.price)}</p>
-                {product.comparePrice && (
-                  <p className="text-sm text-muted-foreground line-through">
-                    {fmt(product.comparePrice)}
-                  </p>
+              <h3 className="text-sm font-medium text-muted-foreground mb-1">Total Stock</h3>
+              <p className="font-medium text-blue-600">{(product.stockQuantity || 0)} pcs</p>
+            </div>
+          </div>
+
+          {/* Price Section */}
+          <div className="border-t pt-4">
+            <h3 className="text-base font-semibold mb-3">Pricing & Variant Details</h3>
+            {product.hasVariants && product.variants && product.variants.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left border-collapse">
+                  <thead>
+                    <tr className="bg-muted/50">
+                      <th className="p-2 border font-medium">SKU (Color-Size)</th>
+                      <th className="p-2 border font-medium">Actual Price</th>
+                      <th className="p-2 border font-medium">MRP</th>
+                      <th className="p-2 border font-medium">Stock</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {product.variants.map((v) => {
+                      const color = v.color || v.optionValues?.find(o => o.optionName.toLowerCase() === 'color')?.value || '';
+                      const size = v.size || v.optionValues?.find(o => o.optionName.toLowerCase() === 'size')?.value || '';
+                      const sku = `${color}${color && size ? '-' : ''}${size}`;
+                      
+                      return (
+                        <tr key={v.id}>
+                          <td className="p-2 border font-medium">
+                            {sku || 'N/A'}
+                          </td>
+                          <td className="p-2 border font-semibold">{fmt(v.price)}</td>
+                          <td className="p-2 border text-muted-foreground">
+                            {fmt(v.mrp || v.comparePrice || v.price)}
+                          </td>
+                          <td className="p-2 border">
+                            {(v.stockQuantity ?? v.stock ?? 0)} pcs
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="flex items-center gap-6">
+                <div>
+                  <h4 className="text-xs font-medium text-muted-foreground mb-1 uppercase tracking-wider">Selling Price</h4>
+                  <p className="text-lg font-semibold">{fmt(product.price)}</p>
+                </div>
+                {(product.comparePrice || 0) > 0 && (
+                  <div>
+                    <h4 className="text-xs font-medium text-muted-foreground mb-1 uppercase tracking-wider">MRP</h4>
+                    <p className="text-lg text-muted-foreground line-through">{fmt(product.comparePrice || 0)}</p>
+                  </div>
                 )}
               </div>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">Low Stock Threshold</h3>
-              <p>{product.lowStockThreshold}</p>
-            </div>
+            )}
           </div>
 
           {/* Description */}

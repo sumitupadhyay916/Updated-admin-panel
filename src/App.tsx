@@ -8,6 +8,9 @@ import { Toaster } from '@/components/ui/sonner';
 import Login from '@/pages/auth/Login';
 import ActivateSeller from '@/pages/auth/ActivateSeller';
 
+// Shared Pages
+import Profile from '@/pages/shared/Profile';
+
 // Super Admin Pages
 import SuperAdminDashboard from '@/pages/super-admin/Dashboard';
 import AdminManagement from '@/pages/super-admin/AdminManagement';
@@ -145,6 +148,7 @@ function App() {
           <Route path="/super-admin/payouts" element={<PayoutsManagement />} />
           <Route path="/super-admin/support-pages" element={<SupportPages />} />
           <Route path="/super-admin/support-pages/:slug" element={<SupportPages />} />
+          <Route path="/super-admin/profile" element={<Profile />} />
         </Route>
 
         {/* Admin Routes */}
@@ -166,6 +170,7 @@ function App() {
           <Route path="/admin/support-pages/:slug" element={<SupportPages />} />
           <Route path="/admin/coupons" element={<ListCoupon />} />
           <Route path="/admin/coupons/create" element={<CreateCoupon />} />
+          <Route path="/admin/profile" element={<Profile />} />
         </Route>
 
         {/* Seller & Staff Routes */}
@@ -192,6 +197,7 @@ function App() {
           <Route path="/seller/settings/faqs" element={<SellerSupportPages />} />
           <Route path="/seller/settings/privacy-policy" element={<SellerSupportPages />} />
           <Route path="/seller/settings/terms-conditions" element={<SellerSupportPages />} />
+          <Route path="/seller/profile" element={<Profile />} />
         </Route>
 
         {/* Default Redirect */}
