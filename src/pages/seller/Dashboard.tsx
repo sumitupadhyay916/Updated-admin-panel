@@ -45,8 +45,10 @@ export default function SellerDashboard() {
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fmt = (v: number) =>
-    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v);
+  const fmt = (v: number | string | null | undefined) => {
+    const val = typeof v === 'number' ? v : Number(v) || 0;
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(isNaN(val) ? 0 : val);
+  };
 
   useEffect(() => {
     if (!user || (isStaff && !sellerId)) return;
@@ -70,7 +72,7 @@ export default function SellerDashboard() {
     void load();
   }, [user]);
 
-  const hasChartData = dash.chartData.some(d => d.sales > 0 || d.orders > 0);
+  const hasChartData = (dash.chartData || []).some(d => d.sales > 0 || d.orders > 0);
 
   return (
     <div className="space-y-6">
@@ -88,7 +90,7 @@ export default function SellerDashboard() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Total Earnings</p>
                 <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                  {fmt(dash.totalEarnings)}
+                  {fmt(dash?.totalEarnings)}
                 </p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900">
@@ -158,7 +160,7 @@ export default function SellerDashboard() {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={dash.chartData}>
+                <LineChart data={dash.chartData || []}>
                   <CartesianGrid strokeDasharray="3 3" className="dark:stroke-gray-700" />
                   <XAxis dataKey="name" stroke="#888" tick={{ fontSize: 12 }} />
                   <YAxis stroke="#888" tick={{ fontSize: 12 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
@@ -189,7 +191,7 @@ export default function SellerDashboard() {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={dash.chartData}>
+                <BarChart data={dash.chartData || []}>
                   <CartesianGrid strokeDasharray="3 3" className="dark:stroke-gray-700" />
                   <XAxis dataKey="name" stroke="#888" tick={{ fontSize: 12 }} />
                   <YAxis stroke="#888" tick={{ fontSize: 12 }} allowDecimals={false} />
