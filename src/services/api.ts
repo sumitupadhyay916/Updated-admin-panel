@@ -7,7 +7,7 @@ import type {
 
 // API base URL
 const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  import.meta.env.VITE_API_URL || "https://innoradeapi.hireacoder.in/";
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -1063,17 +1063,17 @@ export const staffApi = {
     const response = await apiClient.get('/staff');
     return response.data;
   },
-  
+
   createStaff: async (data: any): Promise<ApiResponse<unknown>> => {
     const response = await apiClient.post('/staff', data);
     return response.data;
   },
-  
+
   updateStaff: async (id: string, data: any): Promise<ApiResponse<unknown>> => {
     const response = await apiClient.put(`/staff/${id}`, data);
     return response.data;
   },
-  
+
   deleteStaff: async (id: string): Promise<ApiResponse<null>> => {
     const response = await apiClient.delete(`/staff/${id}`);
     return response.data;
