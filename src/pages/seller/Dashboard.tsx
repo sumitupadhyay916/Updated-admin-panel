@@ -70,7 +70,7 @@ export default function SellerDashboard() {
     void load();
   }, [user]);
 
-  const hasChartData = dash.chartData.some(d => d.sales > 0 || d.orders > 0);
+  const hasChartData = dash && Array.isArray(dash.chartData) ? dash.chartData.some(d => d.sales > 0 || d.orders > 0) : false;
 
   return (
     <div className="space-y-6">
