@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, type ReactNode } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { PageHeader } from '@/components/ui/page-header';
 import { DataTable } from '@/components/ui/data-table';
@@ -38,6 +38,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { SuccessModal } from '@/components/SuccessModal';
 import { 
   Plus, 
   Edit2, 
@@ -49,7 +50,9 @@ import {
   IndianRupee,
   Eye,
   Trash2,
+  Loader2,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const createSellerFormSchema = (isSuperAdmin: boolean) => z.object({
   businessName: z.string().min(2, 'Business name must be at least 2 characters'),
@@ -76,6 +79,9 @@ export default function SellerManagement() {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [sellerToDelete, setSellerToDelete] = useState<Seller | null>(null);
+  const [isAddingSeller, setIsAddingSeller] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | ReactNode>('');
 
   useEffect(() => {
     const loadSellers = async () => {
@@ -151,6 +157,7 @@ export default function SellerManagement() {
 
   const handleAddSeller = async (data: SellerFormValues) => {
     try {
+      setIsAddingSeller(true);
       // For regular admins, use their own email. For super admins, require adminEmail
       const adminEmail = isSuperAdmin 
         ? (data.adminEmail || '')
@@ -193,14 +200,24 @@ export default function SellerManagement() {
         if (refreshResponse.success && Array.isArray(refreshResponse.data)) {
           setSellers(refreshResponse.data as Seller[]);
         }
+        setSuccessMessage(
+  <>
+    Email has been successfully sent to{" "}
+    <a href={`mailto:${data.email}`} className="text-blue-500 underline">
+      {data.email}
+    </a>{" "}
+    to change the password.
+  </>
+);
+        setIsSuccessModalOpen(true);
       } else {
         // Handle API error response with detailed errors
         let errorMessage = response.message || 'Failed to create seller';
         if (response.errors && Array.isArray(response.errors) && response.errors.length > 0) {
-          const fieldErrors = response.errors.map((e: any) => `${e.field || ''}: ${e.message}`).join('\n');
-          errorMessage = `${errorMessage}\n\n${fieldErrors}`;
+          const fieldErrors = response.errors.map((e: any) => `${e.field || ''}: ${e.message}`).join(', ');
+          errorMessage = `${errorMessage}: ${fieldErrors}`;
         }
-        alert(`Error: ${errorMessage}`);
+        toast.error(errorMessage);
       }
     } catch (error: any) {
       console.error('Failed to create seller', error);
@@ -211,14 +228,16 @@ export default function SellerManagement() {
         const errorData = error.response.data;
         errorMessage = errorData.message || errorMessage;
         if (errorData.errors && Array.isArray(errorData.errors) && errorData.errors.length > 0) {
-          const fieldErrors = errorData.errors.map((e: any) => `${e.field || ''}: ${e.message}`).join('\n');
-          errorMessage = `${errorMessage}\n\n${fieldErrors}`;
+          const fieldErrors = errorData.errors.map((e: any) => `${e.field || ''}: ${e.message}`).join(', ');
+          errorMessage = `${errorMessage}: ${fieldErrors}`;
         }
       } else if (error?.message) {
         errorMessage = error.message;
       }
       
-      alert(`Error: ${errorMessage}`);
+      toast.error(errorMessage);
+    } finally {
+      setIsAddingSeller(false);
     }
   };
 
@@ -599,8 +618,15 @@ export default function SellerManagement() {
                     )}
                   />
                   <DialogFooter>
-                    <Button type="submit" className="bg-gradient-to-r from-orange-500 to-amber-500">
-                      Create Seller
+                    <Button type="submit" className="bg-gradient-to-r from-orange-500 to-amber-500" disabled={isAddingSeller}>
+                      {isAddingSeller ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        'Create Seller'
+                      )}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -663,6 +689,12 @@ export default function SellerManagement() {
           </CardContent>
         </Card>
       </div>
+
+      <SuccessModal 
+        isOpen={isSuccessModalOpen} 
+        onOpenChange={setIsSuccessModalOpen} 
+        message={successMessage} 
+      />
 
       {/* Sellers Table */}
       <Card className="dark:border-gray-700 dark:bg-gray-800">
