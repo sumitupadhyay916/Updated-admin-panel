@@ -82,6 +82,7 @@ export default function SellerManagement() {
   const [isAddingSeller, setIsAddingSeller] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | ReactNode>('');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadSellers = async () => {
@@ -96,6 +97,8 @@ export default function SellerManagement() {
       } catch (error) {
         console.error('Failed to load sellers', error);
         setSellers([]);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -337,11 +340,9 @@ export default function SellerManagement() {
           const seller = row.original;
           return (
             <div className="flex items-center gap-3">
-              <img
-                src={seller.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${seller.id}`}
-                alt={seller.name}
-                className="h-10 w-10 rounded-full"
-              />
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-semibold flex-shrink-0">
+                {seller.name.charAt(0).toUpperCase()}
+              </div>
               <div>
                 <p className="font-medium text-gray-900 dark:text-white">{seller.businessName}</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">{seller.name}</p>
@@ -704,7 +705,8 @@ export default function SellerManagement() {
             data={sellers}
             searchKey="businessName"
             searchPlaceholder="Search sellers..."
-            pageSize={5}
+            pageSize={10}
+            isLoading={isLoading}
           />
         </CardContent>
       </Card>
@@ -721,11 +723,9 @@ export default function SellerManagement() {
           {sellerToDelete && (
             <div className="py-4">
               <div className="flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700">
-                <img
-                  src={sellerToDelete.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${sellerToDelete.id}`}
-                  alt={sellerToDelete.name}
-                  className="h-10 w-10 rounded-full"
-                />
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-semibold flex-shrink-0">
+                  {sellerToDelete.name.charAt(0).toUpperCase()}
+                </div>
                 <div>
                   <p className="font-medium text-gray-900 dark:text-white">{sellerToDelete.businessName}</p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">{sellerToDelete.name} • {sellerToDelete.email}</p>
@@ -764,11 +764,9 @@ export default function SellerManagement() {
           {selectedSeller && (
             <div className="space-y-6">
               <div className="flex items-center gap-4">
-                <img
-                  src={selectedSeller.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedSeller.id}`}
-                  alt={selectedSeller.name}
-                  className="h-16 w-16 rounded-full"
-                />
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white text-2xl font-semibold shadow-md flex-shrink-0">
+                  {selectedSeller.name.charAt(0).toUpperCase()}
+                </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                     {selectedSeller.businessName}

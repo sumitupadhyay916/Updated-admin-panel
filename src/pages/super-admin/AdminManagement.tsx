@@ -74,6 +74,7 @@ export default function AdminManagement() {
   const [successMessage, setSuccessMessage] = useState<string | ReactNode>('');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [adminToDelete, setAdminToDelete] = useState<Admin | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadAdmins = async () => {
@@ -87,6 +88,8 @@ export default function AdminManagement() {
       } catch (error) {
         console.error('Failed to load admins', error);
         setAdmins([]);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -624,6 +627,7 @@ export default function AdminManagement() {
             searchKey="name"
             searchPlaceholder="Search admins..."
             pageSize={10}
+            isLoading={isLoading}
           />
         </CardContent>
       </Card>
