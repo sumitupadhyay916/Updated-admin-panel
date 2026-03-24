@@ -15,6 +15,12 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Form,
   FormControl,
   FormField,
@@ -48,6 +54,8 @@ import {
   Phone,
   FolderTree,
   Loader2,
+  MoreVertical,
+  Key,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -75,6 +83,7 @@ export default function AdminManagement() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [adminToDelete, setAdminToDelete] = useState<Admin | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loginDetailsAdmin, setLoginDetailsAdmin] = useState<Admin | null>(null);
 
   useEffect(() => {
     const loadAdmins = async () => {
@@ -409,15 +418,29 @@ export default function AdminManagement() {
                 <CheckCircle className="h-4 w-4" />
               )}
             </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => openDeleteDialog(admin)}
-                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-                    title="Delete Admin"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="More Options">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="dark:border-gray-700 dark:bg-gray-800">
+                <DropdownMenuItem 
+                  onClick={() => setLoginDetailsAdmin(admin)}
+                  className="cursor-pointer dark:text-gray-300 dark:focus:bg-gray-700"
+                >
+                  <Key className="mr-2 h-4 w-4" />
+                  View Username & Password
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => openDeleteDialog(admin)}
+                  className="cursor-pointer text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:bg-red-950/50 dark:focus:text-red-400"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Remove User
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         );
       },
@@ -612,7 +635,50 @@ export default function AdminManagement() {
               className="bg-red-600 text-white hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
             >
               <Trash2 className="mr-2 h-4 w-4" />
-              Delete Admin
+              Remove Admin
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Login Details Dialog */}
+      <Dialog open={!!loginDetailsAdmin} onOpenChange={(open) => !open && setLoginDetailsAdmin(null)}>
+        <DialogContent className="sm:max-w-[425px] dark:border-gray-700 dark:bg-gray-800">
+          <DialogHeader>
+            <DialogTitle className="dark:text-white">Admin Login Details</DialogTitle>
+            <DialogDescription className="dark:text-gray-400">
+              Credentials for {loginDetailsAdmin?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-300">
+                Username / Email
+              </label>
+              <Input 
+                readOnly 
+                value={loginDetailsAdmin?.email || ''} 
+                className="dark:border-gray-700 dark:bg-gray-900 dark:text-white read-only:bg-gray-100 dark:read-only:bg-gray-900"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-300">
+                Password
+              </label>
+              <Input 
+                readOnly 
+                value="Admin@123" 
+                type="text" 
+                className="dark:border-gray-700 dark:bg-gray-900 dark:text-white read-only:bg-gray-100 dark:read-only:bg-gray-900"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Note: Passwords are encrypted in the database. "Admin@123" is the default password used during creation.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setLoginDetailsAdmin(null)} className="bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600">
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
