@@ -567,7 +567,7 @@ export default function Categories() {
                   </FormItem>
                 )}
               />
-                <FormField
+                {/* <FormField
                   control={form.control}
                   name="noOfProducts"
                   render={({ field }) => (
@@ -585,7 +585,7 @@ export default function Categories() {
                       <FormMessage />
                     </FormItem>
                   )}
-                />
+                /> */}
               <DialogFooter>
                 <Button
                   type="button"
