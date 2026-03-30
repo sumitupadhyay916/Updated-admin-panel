@@ -44,7 +44,7 @@ interface NavItem {
 const superAdminNavItems: NavItem[] = [
   { label: 'Dashboard', href: '/super-admin', icon: LayoutDashboard, roles: ['super_admin'] },
   {
-    label: 'Admin Management',
+    label: 'Relation Managers',
     href: '/super-admin/admins',
     icon: Shield,
     roles: ['super_admin'],
@@ -181,6 +181,13 @@ const sellerNavItems: NavItem[] = [
     label: 'My Products',
     href: '/seller/products',
     icon: Package,
+    roles: ['seller', 'staff'],
+    permissions: ['manage_products'],
+  },
+  {
+    label: 'Categories',
+    href: '/seller/categories',
+    icon: Warehouse,
     roles: ['seller', 'staff'],
     permissions: ['manage_products'],
   },

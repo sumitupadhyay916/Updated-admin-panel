@@ -42,7 +42,7 @@ function ProtectedRoute({
   allowedRoles: string[];
 }) {
   const { isAuthenticated, user } = useAuthStore();
-
+  
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
@@ -68,7 +68,7 @@ function ProtectedRoute({
 // Public Route - redirects to dashboard if already logged in
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user } = useAuthStore();
-
+  
   if (isAuthenticated) {
     switch (user?.role) {
       case 'super_admin':
@@ -76,6 +76,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
       case 'admin':
         return <Navigate to="/admin" replace />;
       case 'seller':
+        return <Navigate to="/seller" replace />;
       case 'staff':
         return <Navigate to="/seller" replace />;
       default:
@@ -88,14 +89,14 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   const { isAuthenticated, fetchProfile } = useAuthStore();
-
+  
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
-
+    
     if (isAuthenticated) {
       // Call immediately on mount/refresh to ensure latest permissions
       fetchProfile();
-
+      
       // Poll profile every 30 seconds to update permissions if seller changed them
       interval = setInterval(() => {
         fetchProfile();
@@ -185,6 +186,7 @@ function App() {
           <Route path="/seller/inventory" element={<SellerInventory />} />
           <Route path="/seller/products" element={<ProductsManagement />} />
           <Route path="/seller/orders" element={<OrdersManagement />} />
+          <Route path="/seller/categories" element={<Categories />} />
           <Route path="/seller/payouts" element={<PayoutsManagement />} />
           <Route path="/seller/coupons" element={<ListCoupon />} />
           <Route path="/seller/coupons/create" element={<CreateCoupon />} />

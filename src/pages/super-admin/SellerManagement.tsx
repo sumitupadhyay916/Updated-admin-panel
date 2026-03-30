@@ -54,14 +54,17 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const createSellerFormSchema = (isSuperAdmin: boolean) => z.object({
+const createSellerFormSchema = (isSuperAdmin: boolean, isEdit: boolean = false) => z.object({
   businessName: z.string().min(2, 'Business name must be at least 2 characters'),
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
-  phone: z.string().min(10, 'Phone must be at least 10 digits'),
-  adminEmail: isSuperAdmin 
-    ? z.string().email('Invalid admin email').min(1, 'Admin email is required')
-    : z.string().email('Invalid admin email').optional(),
+  phone: isEdit 
+    ? z.string().transform(v => v || '').refine(v => v === '' || v.length >= 10, 'Phone must be at least 10 digits')
+    : z.string().min(10, 'Phone must be at least 10 digits'),
+  adminEmail: z.string().optional().or(z.literal('')).refine(
+    (val) => !val || val === '' || z.string().email().safeParse(val).success,
+    { message: 'Invalid admin email' }
+  ),
   // commissionRate: z.number().min(0).max(50),
   status: z.enum(['active', 'inactive', 'suspended']),
 });
@@ -130,10 +133,11 @@ export default function SellerManagement() {
     void loadAdmins();
   }, []);
 
-  const sellerFormSchema = useMemo(() => createSellerFormSchema(isSuperAdmin), [isSuperAdmin]);
+  const createSchema = useMemo(() => createSellerFormSchema(isSuperAdmin, false), [isSuperAdmin]);
+  const editSchema = useMemo(() => createSellerFormSchema(isSuperAdmin, true), [isSuperAdmin]);
 
   const form = useForm<SellerFormValues>({
-    resolver: zodResolver(sellerFormSchema),
+    resolver: zodResolver(createSchema),
     defaultValues: {
       businessName: '',
       name: '',
@@ -146,7 +150,7 @@ export default function SellerManagement() {
   });
 
   const editForm = useForm<SellerFormValues>({
-    resolver: zodResolver(sellerFormSchema),
+    resolver: zodResolver(editSchema),
     defaultValues: {
       businessName: '',
       name: '',
@@ -161,18 +165,10 @@ export default function SellerManagement() {
   const handleAddSeller = async (data: SellerFormValues) => {
     try {
       setIsAddingSeller(true);
-      // For regular admins, use their own email. For super admins, require adminEmail
+      // For regular admins, use their own email. For super admins, use provided adminEmail or leave empty
       const adminEmail = isSuperAdmin 
         ? (data.adminEmail || '')
         : (user?.email || '');
-
-      if (!adminEmail) {
-        form.setError('adminEmail', {
-          type: 'manual',
-          message: 'Please select an admin',
-        });
-        return;
-      }
 
       const response = await sellersApi.createSeller({
         email: data.email,
@@ -182,7 +178,7 @@ export default function SellerManagement() {
         businessName: data.businessName,
         businessAddress: '', // Optional - backend will use default if empty
         gstNumber: undefined,
-        adminEmail: adminEmail,
+        ...(adminEmail && { adminEmail }), // Only include if adminEmail is not empty
         // commissionRate: data.commissionRate,
       });
 
@@ -259,7 +255,7 @@ export default function SellerManagement() {
       });
 
       if (response.success && response.data) {
-        const updated = response.data as Seller;
+        const updated = { ...selectedSeller, ...(response.data as Seller) };
         setSellers((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
         setIsEditDialogOpen(false);
         setSelectedSeller(null);
@@ -550,11 +546,11 @@ export default function SellerManagement() {
                       name="adminEmail"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="dark:text-gray-300">Admin Email</FormLabel>
+                          <FormLabel className="dark:text-gray-300">Relation manager(Optional)</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger className="dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-                                <SelectValue placeholder="Select an admin" />
+                                <SelectValue placeholder="Relation manager" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent className="dark:border-gray-700 dark:bg-gray-800">

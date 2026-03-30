@@ -431,7 +431,7 @@ export default function AdminManagement() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Admin Management"
+        title="Relation Managers"
         description="Manage platform administrators and their permissions"
         icon={Shield}
         actions={

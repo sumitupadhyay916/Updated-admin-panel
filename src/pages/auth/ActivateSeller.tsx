@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { authApi } from '@/services/api';
+import { useAuthStore } from '@/store/authStore';
 import { toast } from 'sonner';
 
 const activateFormSchema = z.object({
@@ -82,9 +83,28 @@ export default function ActivateSeller() {
         password: data.password,
       });
 
-      if (response.success) {
-        toast.success('Account activated successfully! You can now login.');
-        navigate('/login');
+      if (response?.success && response?.data) {
+        // Update auth store with new user and token
+        useAuthStore.setState({
+          user: response.data.user,
+          token: response.data.token,
+          isAuthenticated: true,
+        });
+        
+        toast.success('Account activated successfully! Redirecting...');
+
+        const userRole = response?.data?.user?.role;
+        
+        // Navigate based on role
+        if (userRole === 'seller' || userRole === 'staff') {
+          navigate('/seller', { replace: true });
+        } else if (userRole === 'admin') {
+          navigate('/admin', { replace: true });
+        } else if (userRole === 'super_admin') {
+          navigate('/super-admin', { replace: true });
+        } else {
+          navigate('/login', { replace: true });
+        }
       } else {
         toast.error(response.message || 'Failed to activate account');
       }
@@ -116,7 +136,7 @@ export default function ActivateSeller() {
           <p className="font-medium text-gray-500">
             {verificationError || 'Activation token is missing or invalid. Please check your email link.'}
           </p>
-          <Button onClick={() => navigate('/login')} className="mt-4">
+          <Button onClick={() => navigate('/dashboard')} className="mt-4">
             Go to Login
           </Button>
         </div>
@@ -186,9 +206,12 @@ export default function ActivateSeller() {
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Activating...
+                  </>
                 ) : (
-                  'Click to Login'
+                  'Set Password & Login'
                 )}
               </Button>
             </form>
