@@ -54,7 +54,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const createSellerFormSchema = (isSuperAdmin: boolean, isEdit: boolean = false) => z.object({
+const createSellerFormSchema = (isEdit: boolean = false) => z.object({
   businessName: z.string().min(2, 'Business name must be at least 2 characters'),
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
@@ -73,7 +73,7 @@ type SellerFormValues = z.infer<ReturnType<typeof createSellerFormSchema>>;
 
 export default function SellerManagement() {
   const { user } = useAuthStore();
-  //ts-ignore
+  //@ts-ignore
   const isSuperAdmin = user?.role === 'super_admin';
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);
@@ -134,8 +134,8 @@ export default function SellerManagement() {
     void loadAdmins();
   }, []);
 
-  const createSchema = useMemo(() => createSellerFormSchema(isSuperAdmin, false), [isSuperAdmin]);
-  const editSchema = useMemo(() => createSellerFormSchema(isSuperAdmin, true), [isSuperAdmin]);
+  const createSchema = useMemo(() => createSellerFormSchema(false), []);
+  const editSchema = useMemo(() => createSellerFormSchema(true), []);
 
   const form = useForm<SellerFormValues>({
     resolver: zodResolver(createSchema),
