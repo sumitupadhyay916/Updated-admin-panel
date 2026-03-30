@@ -73,6 +73,7 @@ type SellerFormValues = z.infer<ReturnType<typeof createSellerFormSchema>>;
 
 export default function SellerManagement() {
   const { user } = useAuthStore();
+  //ts-ignore
   const isSuperAdmin = user?.role === 'super_admin';
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);
