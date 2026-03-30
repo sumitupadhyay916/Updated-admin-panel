@@ -39,7 +39,7 @@ jobs:
             npm run build
 
             echo "Starting or restarting PM2 app..."
-            if pm2 describe innorade-admin > /dev/null; then
+            if pm2 show innorade-admin > /dev/null 2>&1; then
               pm2 restart innorade-admin
             else
               pm2 start "npx serve -s dist -l 3000" --name innorade-admin
