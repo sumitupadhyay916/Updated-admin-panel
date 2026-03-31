@@ -38,11 +38,14 @@ jobs:
             echo "Building project..."
             npm run build
 
+            echo "Installing serve globally..."
+            npm install -g serve
+
             echo "Starting or restarting PM2 app..."
             if pm2 show innorade-admin > /dev/null 2>&1; then
               pm2 restart innorade-admin
             else
-              pm2 start "npx serve -s dist -l 5173" --name innorade-admin
+              pm2 start "serve -s dist -l 5173" --name innorade-admin
             fi
 
             pm2 save
