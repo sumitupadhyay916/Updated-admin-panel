@@ -166,9 +166,11 @@ export default function SellerManagement() {
   const handleAddSeller = async (data: SellerFormValues) => {
     try {
       setIsAddingSeller(true);
-      // For regular admins, use their own email. For super admins, use provided adminEmail or leave empty
-      const adminEmail = isSuperAdmin 
-        ? (data.adminEmail || '')
+      // For regular admins, use their own email.
+      // For super admins, use the selected adminEmail or fall back to their own email
+      // (backend requires adminEmail, and super_admin is a valid role for it)
+      const adminEmail = isSuperAdmin
+        ? (data.adminEmail || user?.email || '')
         : (user?.email || '');
 
       const response = await sellersApi.createSeller({
@@ -179,7 +181,7 @@ export default function SellerManagement() {
         businessName: data.businessName,
         businessAddress: '', // Optional - backend will use default if empty
         gstNumber: undefined,
-        ...(adminEmail && { adminEmail }), // Only include if adminEmail is not empty
+        adminEmail: adminEmail || undefined, // Always send when available
         // commissionRate: data.commissionRate,
       });
 
@@ -202,7 +204,7 @@ export default function SellerManagement() {
         }
         setSuccessMessage(
   <>
-    Email has been successfully sent to{" "}
+    Email 1234579789 has been successfully sent to{" "}
     <a href={`mailto:${data.email}`} className="text-blue-500 underline">
       {data.email}
     </a>{" "}

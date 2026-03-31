@@ -84,12 +84,16 @@ export default function ActivateSeller() {
       });
 
       if (response?.success && response?.data) {
-        // Update auth store with new user and token
-        useAuthStore.setState({
+        // Manually update the persisted storage to ensure it's saved
+        const authData = {
           user: response.data.user,
           token: response.data.token,
           isAuthenticated: true,
-        });
+        };
+        
+        // Update both the store state and sessionStorage
+        useAuthStore.setState(authData);
+        sessionStorage.setItem('auth-storage', JSON.stringify({ state: authData, version: 0 }));
         
         toast.success('Account activated successfully! Redirecting...');
 

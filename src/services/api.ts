@@ -5,9 +5,13 @@ import type {
   AxiosError,
 } from "axios";
 
-// API base URL
+// API base URL — dev on localhost always hits local API (ignore prod URL in .env)
 const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "https://innoradeapi.hireacoder.in/";
+  import.meta.env.DEV &&
+  typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+    ? "http://localhost:5000/api"
+    : import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
