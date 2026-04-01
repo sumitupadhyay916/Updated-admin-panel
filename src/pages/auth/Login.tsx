@@ -8,27 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 // import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Eye, EyeOff, Loader2, Moon, Sun, Sparkles } from 'lucide-react';
 // import type { UserRole } from '@/types';
 
-const roleOptions: { value: string; label: string }[] = [
-  { value: 'super_admin', label: 'Super Admin' },
-  { value: 'admin', label: 'Admin' },
-  { value: 'seller', label: 'Seller' },
-];
-
-const mockCredentials: Record<string, { email: string; password: string }> = {
-  super_admin: { email: 'super@divine.com', password: 'admin123' },
-  admin: { email: 'admin@divine.com', password: 'admin123' },
-  seller: { email: 'seller@divine.com', password: 'seller123' },
-};
 
 export default function Login() {
   const navigate = useNavigate();
@@ -37,42 +19,37 @@ export default function Login() {
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<string>('super_admin');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
-  const handleRoleChange = (value: string) => {
-    setRole(value);
-    if (value === 'staff') {
-      setEmail('');
-      setPassword('');
-    } else {
-      setEmail(mockCredentials[value].email);
-      setPassword(mockCredentials[value].password);
-    }
-    setError('');
-  };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    const success = await login({ email, password, role: role as any });
+    const success = await login({ email, password });
     
     if (success) {
-      // Redirect based on role
-      switch (role) {
-        case 'super_admin':
-          navigate('/super-admin');
-          break;
-        case 'admin':
-          navigate('/admin');
-          break;
-        case 'seller':
-          navigate('/seller');
-          break;
-        default:
-          navigate('/');
+      // Get the user from the store to determined where to navigate
+      const user = useAuthStore.getState().user;
+      
+      if (user) {
+        // Redirect based on the actual user role returned by the backend
+        switch (user.role) {
+          case 'super_admin':
+            navigate('/super-admin');
+            break;
+          case 'admin':
+            navigate('/admin');
+            break;
+          case 'seller':
+          case 'staff':
+            navigate('/seller');
+            break;
+          default:
+            navigate('/');
+        }
       }
     } else {
       setError('Invalid credentials. Please try again.');
@@ -99,25 +76,7 @@ export default function Login() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Role Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="role" className="dark:text-gray-300">Login As</Label>
-              <Select value={role} onValueChange={handleRoleChange}>
-                <SelectTrigger className="dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent className="dark:border-gray-700 dark:bg-gray-800">
-                  {roleOptions.map((option) => (
-                    <SelectItem 
-                      key={option.value} 
-                      value={option.value}
-                      className="dark:text-white"
-                    >
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+
 
             {/* Email */}
             <div className="space-y-2">
@@ -192,12 +151,6 @@ export default function Login() {
             </button>
           </div>
           
-          {/* <div className="text-center text-xs text-gray-500 dark:text-gray-400">
-            <p>Default Credentials (auto-filled):</p>
-            <p className="mt-1 font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-              {mockCredentials[role].email} / {mockCredentials[role].password}
-            </p>
-          </div> */}
         </CardFooter>
       </Card>
     </div>

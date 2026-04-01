@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { categoriesApi, productsApi } from '@/services/api';
+import { categoriesApi, productsApi, subcategoriesApi } from '@/services/api';
 import { useRole } from '@/store/authStore';
 import type { Category } from '@/types';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -61,6 +61,7 @@ type CategoryFormValues = z.infer<typeof categoryFormSchema>;
 
 export default function Categories() {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<any[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -109,17 +110,25 @@ export default function Categories() {
   const loadCategories = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await categoriesApi.getCategories({
-        page: 1,
-        limit: 1000,
-        search: debouncedSearchQuery || undefined,
-      });
-      if (response.success && Array.isArray(response.data)) {
-        setCategories(response.data as Category[]);
+      const [catResponse, subResponse] = await Promise.all([
+        categoriesApi.getCategories({
+          page: 1,
+          limit: 1000,
+          search: debouncedSearchQuery || undefined,
+        }),
+        subcategoriesApi.getAll()
+      ]);
+
+      if (catResponse.success && Array.isArray(catResponse.data)) {
+        setCategories(catResponse.data as Category[]);
       } else {
-        const errorMsg = response.message || 'Failed to load categories';
+        const errorMsg = catResponse.message || 'Failed to load categories';
         toast.error(errorMsg);
         setCategories([]);
+      }
+
+      if (subResponse.success && Array.isArray(subResponse.data)) {
+        setSubcategories(subResponse.data);
       }
     } catch (error: any) {
       console.error('Failed to load categories', error);
@@ -262,14 +271,6 @@ export default function Categories() {
           cell: ({ row }) => <div className="font-medium">{row.getValue('id')}</div>,
         },
         {
-          accessorKey: 'cid',
-          header: 'CID',
-          cell: ({ row }) => {
-            const cid = row.original.cid || row.original.id;
-            return <div className="font-mono text-xs text-muted-foreground">{cid}</div>;
-          },
-        },
-        {
           accessorKey: 'imageUrl',
           header: 'Image',
           cell: ({ row }) => {
@@ -306,6 +307,17 @@ export default function Categories() {
             );
           },
         },
+        {
+          id: 'subcategories',
+          header: 'Subcategory',
+          cell: ({ row }) => {
+            const categoryId = row.original.id;
+            const count = subcategories.filter(sub => sub.categoryId === categoryId).length;
+            return (
+              <div className="font-medium text-orange-600">{count}</div>
+            );
+          },
+        },
       ];
 
       // Add "Created By" column only for super admins
@@ -332,14 +344,6 @@ export default function Categories() {
           header: 'Created',
           cell: ({ row }) => {
             const date = new Date(row.getValue('createdAt'));
-            return <div>{date.toLocaleDateString('en-GB')} {date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</div>;
-          },
-        },
-        {
-          accessorKey: 'updatedAt',
-          header: 'Updated',
-          cell: ({ row }) => {
-            const date = new Date(row.getValue('updatedAt'));
             return <div>{date.toLocaleDateString('en-GB')} {date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</div>;
           },
         },
@@ -372,7 +376,7 @@ export default function Categories() {
 
       return cols;
     },
-    [isSuperAdmin],
+    [isSuperAdmin, subcategories],
   );
 
 
@@ -567,7 +571,7 @@ export default function Categories() {
                   </FormItem>
                 )}
               />
-                <FormField
+                {/* <FormField
                   control={form.control}
                   name="noOfProducts"
                   render={({ field }) => (
@@ -585,7 +589,7 @@ export default function Categories() {
                       <FormMessage />
                     </FormItem>
                   )}
-                />
+                /> */}
               <DialogFooter>
                 <Button
                   type="button"

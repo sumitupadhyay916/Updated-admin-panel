@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, type ReactNode } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { PageHeader } from '@/components/ui/page-header';
 import { DataTable } from '@/components/ui/data-table';
@@ -38,6 +38,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { SuccessModal } from '@/components/SuccessModal';
 import { 
   Plus, 
   Edit2, 
@@ -49,16 +50,21 @@ import {
   IndianRupee,
   Eye,
   Trash2,
+  Loader2,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
-const createSellerFormSchema = (isSuperAdmin: boolean) => z.object({
+const createSellerFormSchema = (isEdit: boolean = false) => z.object({
   businessName: z.string().min(2, 'Business name must be at least 2 characters'),
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
-  phone: z.string().min(10, 'Phone must be at least 10 digits'),
-  adminEmail: isSuperAdmin 
-    ? z.string().email('Invalid admin email').min(1, 'Admin email is required')
-    : z.string().email('Invalid admin email').optional(),
+  phone: isEdit 
+    ? z.string().transform(v => v || '').refine(v => v === '' || v.length >= 10, 'Phone must be at least 10 digits')
+    : z.string().min(10, 'Phone must be at least 10 digits'),
+  adminEmail: z.string().optional().or(z.literal('')).refine(
+    (val) => !val || val === '' || z.string().email().safeParse(val).success,
+    { message: 'Invalid admin email' }
+  ),
   // commissionRate: z.number().min(0).max(50),
   status: z.enum(['active', 'inactive', 'suspended']),
 });
@@ -67,6 +73,7 @@ type SellerFormValues = z.infer<ReturnType<typeof createSellerFormSchema>>;
 
 export default function SellerManagement() {
   const { user } = useAuthStore();
+  //@ts-ignore
   const isSuperAdmin = user?.role === 'super_admin';
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);
@@ -76,6 +83,10 @@ export default function SellerManagement() {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [sellerToDelete, setSellerToDelete] = useState<Seller | null>(null);
+  const [isAddingSeller, setIsAddingSeller] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | ReactNode>('');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadSellers = async () => {
@@ -90,6 +101,8 @@ export default function SellerManagement() {
       } catch (error) {
         console.error('Failed to load sellers', error);
         setSellers([]);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -121,10 +134,11 @@ export default function SellerManagement() {
     void loadAdmins();
   }, []);
 
-  const sellerFormSchema = useMemo(() => createSellerFormSchema(isSuperAdmin), [isSuperAdmin]);
+  const createSchema = useMemo(() => createSellerFormSchema(false), []);
+  const editSchema = useMemo(() => createSellerFormSchema(true), []);
 
   const form = useForm<SellerFormValues>({
-    resolver: zodResolver(sellerFormSchema),
+    resolver: zodResolver(createSchema),
     defaultValues: {
       businessName: '',
       name: '',
@@ -137,7 +151,7 @@ export default function SellerManagement() {
   });
 
   const editForm = useForm<SellerFormValues>({
-    resolver: zodResolver(sellerFormSchema),
+    resolver: zodResolver(editSchema),
     defaultValues: {
       businessName: '',
       name: '',
@@ -151,18 +165,13 @@ export default function SellerManagement() {
 
   const handleAddSeller = async (data: SellerFormValues) => {
     try {
-      // For regular admins, use their own email. For super admins, require adminEmail
-      const adminEmail = isSuperAdmin 
-        ? (data.adminEmail || '')
+      setIsAddingSeller(true);
+      // For regular admins, use their own email.
+      // For super admins, use the selected adminEmail or fall back to their own email
+      // (backend requires adminEmail, and super_admin is a valid role for it)
+      const adminEmail = isSuperAdmin
+        ? (data.adminEmail || user?.email || '')
         : (user?.email || '');
-
-      if (!adminEmail) {
-        form.setError('adminEmail', {
-          type: 'manual',
-          message: 'Please select an admin',
-        });
-        return;
-      }
 
       const response = await sellersApi.createSeller({
         email: data.email,
@@ -172,7 +181,7 @@ export default function SellerManagement() {
         businessName: data.businessName,
         businessAddress: '', // Optional - backend will use default if empty
         gstNumber: undefined,
-        adminEmail: adminEmail,
+        adminEmail: adminEmail || undefined, // Always send when available
         // commissionRate: data.commissionRate,
       });
 
@@ -193,14 +202,24 @@ export default function SellerManagement() {
         if (refreshResponse.success && Array.isArray(refreshResponse.data)) {
           setSellers(refreshResponse.data as Seller[]);
         }
+        setSuccessMessage(
+  <>
+    Email 1234579789 has been successfully sent to{" "}
+    <a href={`mailto:${data.email}`} className="text-blue-500 underline">
+      {data.email}
+    </a>{" "}
+    to change the password.
+  </>
+);
+        setIsSuccessModalOpen(true);
       } else {
         // Handle API error response with detailed errors
         let errorMessage = response.message || 'Failed to create seller';
         if (response.errors && Array.isArray(response.errors) && response.errors.length > 0) {
-          const fieldErrors = response.errors.map((e: any) => `${e.field || ''}: ${e.message}`).join('\n');
-          errorMessage = `${errorMessage}\n\n${fieldErrors}`;
+          const fieldErrors = response.errors.map((e: any) => `${e.field || ''}: ${e.message}`).join(', ');
+          errorMessage = `${errorMessage}: ${fieldErrors}`;
         }
-        alert(`Error: ${errorMessage}`);
+        toast.error(errorMessage);
       }
     } catch (error: any) {
       console.error('Failed to create seller', error);
@@ -211,14 +230,16 @@ export default function SellerManagement() {
         const errorData = error.response.data;
         errorMessage = errorData.message || errorMessage;
         if (errorData.errors && Array.isArray(errorData.errors) && errorData.errors.length > 0) {
-          const fieldErrors = errorData.errors.map((e: any) => `${e.field || ''}: ${e.message}`).join('\n');
-          errorMessage = `${errorMessage}\n\n${fieldErrors}`;
+          const fieldErrors = errorData.errors.map((e: any) => `${e.field || ''}: ${e.message}`).join(', ');
+          errorMessage = `${errorMessage}: ${fieldErrors}`;
         }
       } else if (error?.message) {
         errorMessage = error.message;
       }
       
-      alert(`Error: ${errorMessage}`);
+      toast.error(errorMessage);
+    } finally {
+      setIsAddingSeller(false);
     }
   };
 
@@ -237,7 +258,7 @@ export default function SellerManagement() {
       });
 
       if (response.success && response.data) {
-        const updated = response.data as Seller;
+        const updated = { ...selectedSeller, ...(response.data as Seller) };
         setSellers((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
         setIsEditDialogOpen(false);
         setSelectedSeller(null);
@@ -318,11 +339,9 @@ export default function SellerManagement() {
           const seller = row.original;
           return (
             <div className="flex items-center gap-3">
-              <img
-                src={seller.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${seller.id}`}
-                alt={seller.name}
-                className="h-10 w-10 rounded-full"
-              />
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-semibold flex-shrink-0">
+                {seller.name.charAt(0).toUpperCase()}
+              </div>
               <div>
                 <p className="font-medium text-gray-900 dark:text-white">{seller.businessName}</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">{seller.name}</p>
@@ -530,11 +549,11 @@ export default function SellerManagement() {
                       name="adminEmail"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="dark:text-gray-300">Admin Email</FormLabel>
+                          <FormLabel className="dark:text-gray-300">Relation manager(Optional)</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger className="dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-                                <SelectValue placeholder="Select an admin" />
+                                <SelectValue placeholder="Relation manager" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent className="dark:border-gray-700 dark:bg-gray-800">
@@ -599,8 +618,15 @@ export default function SellerManagement() {
                     )}
                   />
                   <DialogFooter>
-                    <Button type="submit" className="bg-gradient-to-r from-orange-500 to-amber-500">
-                      Create Seller
+                    <Button type="submit" className="bg-gradient-to-r from-orange-500 to-amber-500" disabled={isAddingSeller}>
+                      {isAddingSeller ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        'Create Seller'
+                      )}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -664,6 +690,12 @@ export default function SellerManagement() {
         </Card>
       </div>
 
+      <SuccessModal 
+        isOpen={isSuccessModalOpen} 
+        onOpenChange={setIsSuccessModalOpen} 
+        message={successMessage} 
+      />
+
       {/* Sellers Table */}
       <Card className="dark:border-gray-700 dark:bg-gray-800">
         <CardContent className="p-6">
@@ -672,7 +704,8 @@ export default function SellerManagement() {
             data={sellers}
             searchKey="businessName"
             searchPlaceholder="Search sellers..."
-            pageSize={5}
+            pageSize={10}
+            isLoading={isLoading}
           />
         </CardContent>
       </Card>
@@ -689,11 +722,9 @@ export default function SellerManagement() {
           {sellerToDelete && (
             <div className="py-4">
               <div className="flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700">
-                <img
-                  src={sellerToDelete.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${sellerToDelete.id}`}
-                  alt={sellerToDelete.name}
-                  className="h-10 w-10 rounded-full"
-                />
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-semibold flex-shrink-0">
+                  {sellerToDelete.name.charAt(0).toUpperCase()}
+                </div>
                 <div>
                   <p className="font-medium text-gray-900 dark:text-white">{sellerToDelete.businessName}</p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">{sellerToDelete.name} • {sellerToDelete.email}</p>
@@ -732,11 +763,9 @@ export default function SellerManagement() {
           {selectedSeller && (
             <div className="space-y-6">
               <div className="flex items-center gap-4">
-                <img
-                  src={selectedSeller.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedSeller.id}`}
-                  alt={selectedSeller.name}
-                  className="h-16 w-16 rounded-full"
-                />
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white text-2xl font-semibold shadow-md flex-shrink-0">
+                  {selectedSeller.name.charAt(0).toUpperCase()}
+                </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                     {selectedSeller.businessName}

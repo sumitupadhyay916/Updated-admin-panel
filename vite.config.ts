@@ -5,7 +5,7 @@ import { inspectAttr } from 'kimi-plugin-inspect-react'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: './',
+  base: '/',
   plugins: [inspectAttr(), react()],
   resolve: {
     alias: {
@@ -13,6 +13,7 @@ export default defineConfig({
     },
   },
   server: {
+    allowedHosts: ['innoradeadmin.hireacoder.in'],
     proxy: {
       '/api': {
         target: process.env.VITE_API_URL || 'http://localhost:5000',
