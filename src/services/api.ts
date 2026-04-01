@@ -7,7 +7,7 @@ import type {
 
 // API base URL
 const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "https://innoradeapi.hireacoder.in/";
+  import.meta.env.VITE_API_URL || "https://innoradeapi.hireacoder.in/api";
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -348,9 +348,9 @@ export interface UpdateProductRequest {
   subcategoryId?: number | null;
   hasVariants?: boolean;
   variants?: Array<{
-    size?: string;
+    attributes?: Record<string, string>;
     color?: string;
-    quality?: string;
+    colorHex?: string;
     price: number;
     mrp: number;
     stockQuantity: number;

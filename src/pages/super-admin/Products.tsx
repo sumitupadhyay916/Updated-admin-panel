@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { PageHeader } from '@/components/ui/page-header';
 import { DataTable } from '@/components/ui/data-table';
@@ -22,8 +22,6 @@ import {
   Check,
   X,
 } from 'lucide-react';
-
-import { ViewProductModal } from '@/components/inventory/ViewProductModal';
 
 import {
   Form,
@@ -110,7 +108,7 @@ const baseProductSchema = {
     h: z.number().optional().default(0),
     l: z.number().optional().default(0),
     w: z.number().optional().default(0),
-  }).optional().default({h:0, l:0, w:0}),
+  }).optional().default({ h: 0, l: 0, w: 0 }),
 };
 
 // Schema for super_admin and admin (sellerId optional)
@@ -130,33 +128,23 @@ type ProductFormValues = z.infer<typeof productFormSchemaWithSeller>;
 export default function ProductsManagement() {
   const { user } = useAuthStore();
   const location = useLocation();
+  const navigate = useNavigate();
   const isSeller = user?.role === 'seller';
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [sellers, setSellers] = useState<Seller[]>([]);
-  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [editSubcategories, setEditSubcategories] = useState<Subcategory[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
-  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [sellerFilter, setSellerFilter] = useState<string>('__all__');
   // Image upload state - supports multiple images
-  const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
   const [editUploadedImageUrls, setEditUploadedImageUrls] = useState<string[]>([]);
   const [isEditUploading, setIsEditUploading] = useState(false);
-  const [isSubcategoriesLoading, setIsSubcategoriesLoading] = useState(false);
   const [isEditSubcategoriesLoading, setIsEditSubcategoriesLoading] = useState(false);
-  // hasVariants toggle state
-  const [addHasVariants, setAddHasVariants] = useState(false);
   const [editHasVariants, setEditHasVariants] = useState(false);
-  // ── Color-Group state for grouped variant UI ──
-  const [addColorGroups, setAddColorGroups] = useState<ColorGroup[]>([]);
   const [editColorGroups, setEditColorGroups] = useState<ColorGroup[]>([]);
 
   // Quick Create State
@@ -167,28 +155,7 @@ export default function ProductsManagement() {
 
   const isMyProductsPage = useMemo(() => location.pathname.endsWith('/my-products'), [location.pathname]);
 
-  const form = useForm<ProductFormValues>({
-    resolver: zodResolver(isSeller ? productFormSchemaWithoutSeller : productFormSchemaWithSeller) as any,
-    defaultValues: {
-      name: '',
-      categoryId: '',
-      subcategoryId: '',
-      sellerId: isSeller ? '' : '__my__',
-      hasVariants: false,
-      price: 0,
-      comparePrice: 0,
-      stock: 'available',
-      variants: [],
-      stockQuantity: 0,
-      brand: '',
-      care: '',
-      materials: '',
-      ageGroups: [],
-      isNew: false,
-      isBestseller: false,
-      dimensions: { h: 0, l: 0, w: 0 },
-    },
-  });
+
 
   const editForm = useForm<ProductFormValues>({
     resolver: zodResolver(isSeller ? productFormSchemaWithoutSeller : productFormSchemaWithSeller) as any,
@@ -289,106 +256,8 @@ export default function ProductsManagement() {
     }
   }, [isMyProductsPage, isSeller]);
 
-  const handleCreateProduct = async (values: ProductFormValues) => {
-    try {
-      setIsLoading(true);
-      // Variant validation (grouped model)
-      if (addHasVariants) {
-        if (addColorGroups.length === 0) {
-          toast.error('Add at least one color group before submitting'); setIsLoading(false); return;
-        }
-        for (const cg of addColorGroups) {
-          if (!cg.color.trim()) { toast.error('All color groups must have a color name'); setIsLoading(false); return; }
-          if (cg.sizes.length === 0) { toast.error(`Color "${cg.color}" must have at least one size`); setIsLoading(false); return; }
-          for (const s of cg.sizes) {
-            if ((s.price ?? 0) <= 0) { toast.error(`Price must be > 0 for all sizes in "${cg.color}"`); setIsLoading(false); return; }
-            if ((s.mrp ?? 0) < (s.price ?? 0)) { toast.error(`MRP must be ≥ Price in "${cg.color}"`); setIsLoading(false); return; }
-          }
-        }
-      }
-      // Flatten ColorGroups → flat variants array for backend
-      const flatVariants = addHasVariants
-        ? addColorGroups.flatMap(cg =>
-            cg.sizes.map(s => ({
-              color: cg.color,
-              colorHex: cg.colorHex,
-              size: s.size,
-              quality: s.quality,
-              price: s.price,
-              mrp: s.mrp,
-              stockQuantity: s.stockQuantity,
-              images: cg.images,
-            }))
-          )
-        : [];
-      const payload: any = {
-        name: values.name,
-        categoryId: parseInt(values.categoryId, 10),
-        hasVariants: addHasVariants,
-        stock: values.stock,
-        brand: values.brand,
-        care: values.care,
-        materials: values.materials,
-        ageGroups: values.ageGroups,
-        isNew: values.isNew,
-        isBestseller: values.isBestseller,
-        dimensions: values.dimensions,
-      };
-      if (values.subcategoryId && values.subcategoryId !== '__none__') {
-        payload.subcategoryId = parseInt(values.subcategoryId, 10);
-      }
-      if (addHasVariants) {
-        payload.variants = flatVariants;
-      } else {
-        payload.price = values.price;
-        payload.comparePrice = values.comparePrice;
-        payload.stockQuantity = values.stockQuantity || 0;
-        if (uploadedImageUrls.length > 0) payload.images = uploadedImageUrls;
-      }
-      if (!isSeller) {
-        if (!values.sellerId || values.sellerId === '__my__') {
-          payload.sellerId = user?.id;
-        } else {
-          payload.sellerId = values.sellerId;
-        }
-      }
-      const response = await productsApi.createProduct(payload);
-      if (response.success && response.data) {
-        toast.success('Product created successfully');
-        setIsAddDialogOpen(false);
-        setUploadedImageUrls([]);
-        setAddHasVariants(false);
-        setAddColorGroups([]);
-        form.reset({
-          name: '',
-          categoryId: '',
-          subcategoryId: '',
-          sellerId: isSeller ? '' : '__my__',
-          hasVariants: false,
-          price: 0,
-          comparePrice: 0,
-          stock: 'available',
-          stockQuantity: 0,
-          variants: [],
-        });
-        setSubcategories([]);
-        await loadProducts();
-        await loadCategories();
-      } else {
-        toast.error(response.message || 'Failed to create product');
-      }
-    } catch (error: any) {
-      console.error('Error creating product:', error);
-      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to create product';
-      toast.error(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const openViewDialog = (product: Product) => {
-    setSelectedProduct(product);
-    setIsViewDialogOpen(true);
+    navigate(`${location.pathname}/${product.id}/view`);
   };
 
   const openEditDialog = useCallback(async (product: Product) => {
@@ -487,17 +356,17 @@ export default function ProductsManagement() {
       // Flatten ColorGroups → flat variants array for backend
       const flatVariants = editHasVariants
         ? editColorGroups.flatMap(cg =>
-            cg.sizes.map(s => ({
-              color: cg.color,
-              colorHex: cg.colorHex,
-              size: s.size,
-              quality: s.quality,
-              price: s.price,
-              mrp: s.mrp,
-              stockQuantity: s.stockQuantity,
-              images: cg.images,
-            }))
-          )
+          cg.sizes.map(s => ({
+            color: cg.color,
+            colorHex: cg.colorHex,
+            size: s.size,
+            quality: s.quality,
+            price: s.price,
+            mrp: s.mrp,
+            stockQuantity: s.stockQuantity,
+            images: cg.images,
+          }))
+        )
         : [];
       const payload: any = {
         name: values.name,
@@ -597,7 +466,7 @@ export default function ProductsManagement() {
 
 
   const handleQuickCreateSubcategory = async () => {
-    const catId = isAddDialogOpen ? form.getValues('categoryId') : editForm.getValues('categoryId');
+    const catId = editForm.getValues('categoryId');
     if (!quickAddName || !catId) return;
 
     try {
@@ -615,10 +484,7 @@ export default function ProductsManagement() {
         toast.success('Subcategory created');
         const subRes = await subcategoriesApi.getByCategory(parseInt(catId, 10));
         if (subRes.success) {
-          if (isAddDialogOpen) {
-            setSubcategories(subRes.data || []);
-            form.setValue('subcategoryId', newSub.id.toString());
-          } else if (isEditDialogOpen) {
+          if (isEditDialogOpen) {
             setEditSubcategories(subRes.data || []);
             editForm.setValue('subcategoryId', newSub.id.toString());
           }
@@ -669,12 +535,10 @@ export default function ProductsManagement() {
         header: 'Products',
         cell: ({ row }: { row: { original: Product } }) => {
           const product = row.original;
-          // Find first available image: main product image or first variant image
+          // Only show first product image
           const displayImage = (product.images && product.images.length > 0)
             ? product.images[0]
-            : (product.variants && product.variants.length > 0 && product.variants[0].images && product.variants[0].images.length > 0)
-              ? product.variants[0].images[0]
-              : null;
+            : null;
 
           return (
             <div className="flex items-center gap-3">
@@ -786,7 +650,7 @@ export default function ProductsManagement() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => openEditDialog(product)}
+                onClick={() => navigate(`${location.pathname}/${product.id}/edit`)}
                 className="h-8 w-8 p-0"
                 title="Edit Product"
               >
@@ -912,7 +776,7 @@ export default function ProductsManagement() {
                 </Select>
               </div>
             )} */}
-            <Button onClick={() => setIsAddDialogOpen(true)}>
+            <Button onClick={() => navigate('create')}>
               <Plus className="h-4 w-4 mr-2" />
               Add Product
             </Button>
@@ -924,523 +788,6 @@ export default function ProductsManagement() {
           />
         </CardContent>
       </Card>
-
-      {/* Create Product Dialog */}
-      <Dialog
-        open={isAddDialogOpen}
-        onOpenChange={(open) => {
-          setIsAddDialogOpen(open);
-          if (!open) {
-            setUploadedImageUrls([]);
-            form.reset({
-              name: '',
-              categoryId: '',
-              subcategoryId: '',
-              sellerId: isSeller ? '' : '__my__',
-              price: 0,
-              stock: 'available',
-              stockQuantity: 0,
-              brand: '', care: '', materials: '', ageGroups: [], isNew: false, isBestseller: false, dimensions: { h: 0, l: 0, w: 0 }
-            });
-            setSubcategories([]);
-          }
-        }}
-      >
-
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Create Product</DialogTitle>
-            <DialogDescription>Add a new product to the marketplace.</DialogDescription>
-          </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleCreateProduct)} className="flex-1 flex flex-col min-h-0">
-              <div className="flex-1 overflow-y-auto pr-2 space-y-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Product Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter product name" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="categoryId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Category</FormLabel>
-                      <div className="flex gap-2">
-                        <Select
-                          onValueChange={async (val) => {
-                            field.onChange(val);
-                            form.setValue('subcategoryId', '');
-                            if (val) {
-                              setIsSubcategoriesLoading(true);
-                              try {
-                                const res = await subcategoriesApi.getByCategory(parseInt(val, 10));
-                                setSubcategories(res.success ? (res.data || []) : []);
-                              } catch {
-                                setSubcategories([]);
-                              } finally {
-                                setIsSubcategoriesLoading(false);
-                              }
-                            } else {
-                              setSubcategories([]);
-                            }
-                          }}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a category" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {categories
-                              .filter(cat => cat.status === 'active')
-                              .map((category) => (
-                                <SelectItem key={category.id} value={category.id.toString()}>
-                                  {category.name}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                {/* Subcategory dropdown — shows after category chosen */}
-                <FormField
-                  control={form.control}
-                  name="subcategoryId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Subcategory <span className="text-gray-400 font-normal">(optional)</span></FormLabel>
-                      <div className="flex gap-2">
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value || '__none__'}
-                          disabled={isSubcategoriesLoading || (!!form.getValues('categoryId') && subcategories.length === 0)}
-                        >
-                          <FormControl>
-                            <SelectTrigger className="flex-1">
-                              <SelectValue placeholder={isSubcategoriesLoading ? "Loading..." : (form.getValues('categoryId') && subcategories.length === 0 ? "No subcategories" : "Select subcategory (optional)")} />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="__none__">— None —</SelectItem>
-                            {subcategories.map((sub) => (
-                              <SelectItem key={sub.id} value={sub.id.toString()}>
-                                {sub.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          onClick={() => setIsQuickAddSubcategoryOpen(true)}
-                          title="Add New Subcategory"
-                          disabled={!form.getValues('categoryId')}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                {!isSeller && (
-                  <FormField
-                    control={form.control}
-                    name="sellerId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Seller</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a seller" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="__my__">My Products</SelectItem>
-                            {sellers
-                              .filter(seller => seller.status === 'active')
-                              .map((seller) => (
-                                <SelectItem key={seller.id} value={seller.id}>
-                                  {seller.businessName} ({seller.email})
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-                {/* ── Has Variants Toggle ── */}
-                <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
-                  <div>
-                    <p className="font-medium text-sm">Has Variants</p>
-                    <p className="text-xs text-muted-foreground">Enable to add size, colour & other variations</p>
-                  </div>
-                  <div className="flex rounded-lg border overflow-hidden">
-                    <button
-                      type="button"
-                      className={`px-4 py-1.5 text-sm font-medium transition-colors ${!addHasVariants ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
-                      onClick={() => setAddHasVariants(false)}
-                    >OFF</button>
-                    <button
-                      type="button"
-                      className={`px-4 py-1.5 text-sm font-medium transition-colors ${addHasVariants ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
-                      onClick={() => setAddHasVariants(true)}
-                    >ON</button>
-                  </div>
-                </div>
-
-                {/* ── Simple Inventory (hasVariants = false) ── */}
-                {!addHasVariants && (
-                  <>
-                    <FormField
-                      control={form.control}
-                      name="price"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Price (₹)</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="0.00" step="0.01" min="0" {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} value={field.value || 0} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="comparePrice"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Compare Price / MRP (₹)</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="0.00" step="0.01" min="0" {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} value={field.value || 0} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="stock"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Stock Status</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Select stock status" /></SelectTrigger></FormControl>
-                            <SelectContent>
-                              <SelectItem value="available">Available</SelectItem>
-                              <SelectItem value="unavailable">Unavailable</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="stockQuantity"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Initial Stock Quantity</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="0" min="0" step="1" {...field}
-                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)} value={field.value || 0} />
-                          </FormControl>
-                          <FormDescription>Set the initial stock quantity for this product</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    {/* Product Images */}
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Product Images</label>
-                      <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4">
-                        {uploadedImageUrls.length > 0 && (
-                          <div className="grid grid-cols-3 gap-3 mb-3">
-                            {uploadedImageUrls.map((url, index) => (
-                              <div key={index} className="relative group">
-                                <img src={url} alt={`Product ${index + 1}`} className="h-20 w-full rounded-lg object-cover border" />
-                                <button type="button"
-                                  onClick={() => setUploadedImageUrls(prev => prev.filter((_, i) => i !== index))}
-                                  className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        <label className="flex flex-col items-center gap-2 cursor-pointer">
-                          {isUploading ? (
-                            <>
-                              <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
-                              <span className="text-sm text-gray-500">Uploading...</span>
-                            </>
-                          ) : (
-                            <>
-                              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
-                                <ImageIcon className="h-6 w-6 text-gray-400" />
-                              </div>
-                              <span className="text-sm text-gray-500">{uploadedImageUrls.length > 0 ? 'Add more images' : 'Click to upload product images'}</span>
-                              <span className="text-xs text-gray-400">JPG, PNG, WEBP up to 10MB</span>
-                            </>
-                          )}
-                          <input type="file" accept="image/*" multiple className="hidden" disabled={isUploading}
-                            onChange={async (e) => {
-                              const files = Array.from(e.target.files || []);
-                              if (!files.length) return;
-                              setIsUploading(true);
-                              try {
-                                const results = await Promise.all(files.map(f => productsApi.uploadImage(f)));
-                                const urls = results.filter(r => r.success && r.data?.url).map(r => r.data!.url);
-                                if (urls.length) { setUploadedImageUrls(prev => [...prev, ...urls]); toast.success(`${urls.length} image(s) uploaded`); }
-                                else toast.error('Failed to upload images');
-                              } catch { toast.error('Failed to upload images'); }
-                              finally { setIsUploading(false); e.target.value = ''; }
-                            }} />
-                        </label>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {/* ── Color-Group Variant UI ── */}
-                {addHasVariants && (
-                  <div className="space-y-3 pt-2 border-t">
-                    <div className="flex items-center justify-between">
-                      <FormLabel className="text-base font-semibold">Color Variants</FormLabel>
-                      <Button type="button" variant="outline" size="sm"
-                        onClick={() => setAddColorGroups(prev => [...prev, makeColorGroup()])}>
-                        <Plus className="h-4 w-4 mr-1" /> Add Color
-                      </Button>
-                    </div>
-                    {addColorGroups.length === 0 && (
-                      <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg text-sm">
-                        No color variants yet. Click &quot;+ Add Color&quot; to begin.
-                      </div>
-                    )}
-                    <div className="space-y-4">
-                      {addColorGroups.map((cg, cgIdx) => {
-                        const totalStock = cg.sizes.reduce((s, sz) => s + (sz.stockQuantity || 0), 0);
-                        const updateCg = (patch: Partial<ColorGroup>) =>
-                          setAddColorGroups(prev => prev.map((g, i) => i === cgIdx ? { ...g, ...patch } : g));
-                        const updateSize = (sIdx: number, patch: Partial<SizeEntry>) =>
-                          setAddColorGroups(prev => prev.map((g, i) => i === cgIdx
-                            ? { ...g, sizes: g.sizes.map((s, si) => si === sIdx ? { ...s, ...patch } : s) } : g));
-                        return (
-                          <Card key={cg.id} className="border-2">
-                            <CardContent className="p-4 space-y-4">
-                              {/* Color header */}
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 flex-1">
-                                  <input type="color" className="h-9 w-9 rounded border cursor-pointer flex-shrink-0"
-                                    value={cg.colorHex}
-                                    onChange={e => updateCg({ colorHex: e.target.value })} />
-                                  <Input placeholder="Color name (e.g. Green)" className="h-9"
-                                    value={cg.color}
-                                    onChange={e => updateCg({ color: e.target.value })} />
-                                  <span className="text-xs whitespace-nowrap bg-muted px-2 py-1 rounded-full font-medium">
-                                    Total: {totalStock} pcs
-                                  </span>
-                                </div>
-                                <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive ml-2"
-                                  onClick={() => setAddColorGroups(prev => prev.filter((_, i) => i !== cgIdx))}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-
-                              {/* Color Images */}
-                              <div>
-                                <p className="text-xs font-medium mb-2">Images for {cg.color || 'this color'}</p>
-                                <div className="flex flex-wrap gap-2 mb-2">
-                                  {cg.images.map((url, imgIdx) => (
-                                    <div key={imgIdx} className="relative group">
-                                      <img src={url} alt="" className="h-14 w-14 rounded object-cover border" />
-                                      <button type="button"
-                                        className="absolute -top-1 -right-1 p-0.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                                        onClick={() => updateCg({ images: cg.images.filter((_, ii) => ii !== imgIdx) })}>
-                                        <X className="h-3 w-3" />
-                                      </button>
-                                    </div>
-                                  ))}
-                                  <label className="flex items-center justify-center h-14 w-14 rounded border-2 border-dashed border-muted-foreground/40 cursor-pointer hover:border-primary transition-colors">
-                                    {cg.imageUploading ? (
-                                      <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full" />
-                                    ) : (
-                                      <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                                    )}
-                                    <input type="file" accept="image/*" multiple className="hidden" disabled={cg.imageUploading}
-                                      onChange={async (e) => {
-                                        const files = Array.from(e.target.files || []);
-                                        if (!files.length) return;
-                                        updateCg({ imageUploading: true });
-                                        try {
-                                          const results = await Promise.all(files.map(f => productsApi.uploadImage(f)));
-                                          const urls = results.filter(r => r.success && r.data?.url).map(r => r.data!.url);
-                                          if (urls.length) { updateCg({ images: [...cg.images, ...urls], imageUploading: false }); toast.success(`${urls.length} image(s) uploaded`); }
-                                          else { updateCg({ imageUploading: false }); toast.error('Failed to upload images'); }
-                                        } catch { updateCg({ imageUploading: false }); toast.error('Upload failed'); }
-                                        finally { e.target.value = ''; }
-                                      }} />
-                                  </label>
-                                </div>
-                              </div>
-
-                              {/* Sizes Table */}
-                              <div>
-                                <div className="flex items-center justify-between mb-2">
-                                  <p className="text-xs font-medium">Sizes & Pricing</p>
-                                  <Button type="button" variant="outline" size="sm" className="h-7 text-xs px-2"
-                                    onClick={() => updateCg({ sizes: [...cg.sizes, { size: '', quality: '', price: 0, mrp: 0, stockQuantity: 0 }] })}>
-                                    <Plus className="h-3 w-3 mr-1" /> Add Size
-                                  </Button>
-                                </div>
-                                {cg.sizes.length > 0 && (
-                                  <div className="rounded-lg border overflow-x-auto">
-                                    <table className="w-full text-xs min-w-[500px]">
-                                      <thead className="bg-muted/60">
-                                        <tr>
-                                          <th className="py-2 px-2 text-left font-medium">Size</th>
-                                          <th className="py-2 px-2 text-left font-medium">Quality</th>
-                                          <th className="py-2 px-2 text-left font-medium">Price ₹</th>
-                                          <th className="py-2 px-2 text-left font-medium">MRP ₹</th>
-                                          <th className="py-2 px-2 text-left font-medium">Stock</th>
-                                          <th className="py-2 px-1" />
-                                        </tr>
-                                      </thead>
-                                      <tbody className="divide-y">
-                                        {cg.sizes.map((sz, sIdx) => (
-                                          <tr key={sIdx} className="hover:bg-muted/30">
-                                            <td className="py-1 px-2">
-                                              <Input className="h-7 text-xs min-w-[4rem]" placeholder="M / L"
-                                                value={sz.size} onChange={e => updateSize(sIdx, { size: e.target.value })} />
-                                            </td>
-                                            <td className="py-1 px-2">
-                                              <Input className="h-7 text-xs min-w-[5rem]" placeholder="Standard"
-                                                value={sz.quality} onChange={e => updateSize(sIdx, { quality: e.target.value })} />
-                                            </td>
-                                            <td className="py-1 px-2">
-                                              <Input type="number" className="h-7 text-xs min-w-[4rem]" placeholder="0"
-                                                value={sz.price || ''} onChange={e => updateSize(sIdx, { price: parseFloat(e.target.value) || 0 })} />
-                                            </td>
-                                            <td className="py-1 px-2">
-                                              <Input type="number" className="h-7 text-xs min-w-[4rem]" placeholder="0"
-                                                value={sz.mrp || ''} onChange={e => updateSize(sIdx, { mrp: parseFloat(e.target.value) || 0 })} />
-                                            </td>
-                                            <td className="py-1 px-2">
-                                              <Input type="number" className="h-7 text-xs min-w-[4rem]" placeholder="0"
-                                                value={sz.stockQuantity || ''} onChange={e => updateSize(sIdx, { stockQuantity: parseInt(e.target.value, 10) || 0 })} />
-                                            </td>
-                                            <td className="py-1 px-1">
-                                              <button type="button" className="text-destructive hover:text-red-700 p-1"
-                                                onClick={() => updateCg({ sizes: cg.sizes.filter((_, si) => si !== sIdx) })}>
-                                                <X className="h-3.5 w-3.5" />
-                                              </button>
-                                            </td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                )}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Extended Details (Optional) ── */}
-                <div className="space-y-4 pt-4 border-t">
-                  <h3 className="font-medium text-sm">Extended Details (Optional)</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField control={form.control} name="brand" render={({ field }) => (
-                      <FormItem><FormLabel>Brand</FormLabel><FormControl><Input placeholder="e.g. Limbu Timbu" {...field} value={field.value || ''}/></FormControl></FormItem>
-                    )} />
-                    <FormField control={form.control} name="materials" render={({ field }) => (
-                      <FormItem><FormLabel>Materials</FormLabel><FormControl><Input placeholder="e.g. Cotton Blend" {...field} value={field.value || ''}/></FormControl></FormItem>
-                    )} />
-                    <FormField control={form.control} name="care" render={({ field }) => (
-                      <FormItem className="col-span-2"><FormLabel>Care Instructions</FormLabel><FormControl><Input placeholder="e.g. Machine wash cold" {...field} value={field.value || ''}/></FormControl></FormItem>
-                    )} />
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <FormField control={form.control} name="dimensions.l" render={({ field }) => (
-                      <FormItem><FormLabel>Length (cm)</FormLabel><FormControl><Input type="number" {...field} onChange={e=>field.onChange(parseFloat(e.target.value)||0)}/></FormControl></FormItem>
-                    )} />
-                    <FormField control={form.control} name="dimensions.w" render={({ field }) => (
-                      <FormItem><FormLabel>Width (cm)</FormLabel><FormControl><Input type="number" {...field} onChange={e=>field.onChange(parseFloat(e.target.value)||0)}/></FormControl></FormItem>
-                    )} />
-                    <FormField control={form.control} name="dimensions.h" render={({ field }) => (
-                      <FormItem><FormLabel>Height (cm)</FormLabel><FormControl><Input type="number" {...field} onChange={e=>field.onChange(parseFloat(e.target.value)||0)}/></FormControl></FormItem>
-                    )} />
-                  </div>
-                  <div className="flex gap-4">
-                     <FormField control={form.control} name="isNew" render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-2 space-y-0 rounded-md border p-3 flex-1">
-                          <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                          <FormLabel className="font-normal cursor-pointer m-0">Mark as New Arrival</FormLabel>
-                        </FormItem>
-                     )} />
-                     <FormField control={form.control} name="isBestseller" render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-2 space-y-0 rounded-md border p-3 flex-1">
-                          <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                          <FormLabel className="font-normal cursor-pointer m-0">Mark as Bestseller</FormLabel>
-                        </FormItem>
-                     )} />
-                  </div>
-                </div>
-
-              </div>
-              <DialogFooter className="pt-4 border-t mt-auto">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setIsAddDialogOpen(false);
-                    setUploadedImageUrls([]);
-                    form.reset({
-                      name: '',
-                      categoryId: '',
-                      subcategoryId: '',
-                      sellerId: '',
-                      price: 0,
-                      stock: 'available',
-                      stockQuantity: 0,
-                      brand: '', care: '', materials: '', ageGroups: [], isNew: false, isBestseller: false, dimensions: { h: 0, l: 0, w: 0 }
-                    });
-                  }}
-                  disabled={isLoading}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isLoading}>
-                  {isLoading ? 'Creating...' : 'Create'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
 
       {/* Edit Product Dialog */}
       <Dialog
@@ -1954,12 +1301,6 @@ export default function ProductsManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <ViewProductModal
-        product={selectedProduct as any}
-        open={isViewDialogOpen}
-        onClose={() => setIsViewDialogOpen(false)}
-      />
 
       {/* Quick Add Subcategory Dialog */}
       <Dialog open={isQuickAddSubcategoryOpen} onOpenChange={setIsQuickAddSubcategoryOpen}>

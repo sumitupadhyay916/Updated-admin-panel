@@ -33,6 +33,11 @@ import SellerSupportPages from '@/pages/seller/SellerSupportPages';
 import SellerInventory from '@/pages/seller/Inventory';
 import StaffManagement from '@/pages/seller/staff/StaffManagement';
 
+// Product Pages
+import CreateProduct from '@/pages/products/CreateProduct';
+import EditProduct from '@/pages/products/EditProduct';
+import ViewProduct from '@/pages/products/ViewProduct';
+
 // Protected Route Component
 function ProtectedRoute({ 
   children, 
@@ -142,7 +147,13 @@ function App() {
           <Route path="/super-admin/admins" element={<AdminManagement />} />
           <Route path="/super-admin/sellers" element={<SellerManagement />} />
           <Route path="/super-admin/products" element={<ProductsManagement />} />
+          <Route path="/super-admin/products/create" element={<CreateProduct />} />
+          <Route path="/super-admin/products/:id/edit" element={<EditProduct />} />
+          <Route path="/super-admin/products/:id/view" element={<ViewProduct />} />
           <Route path="/super-admin/my-products" element={<ProductsManagement />} />
+          <Route path="/super-admin/my-products/create" element={<CreateProduct />} />
+          <Route path="/super-admin/my-products/:id/edit" element={<EditProduct />} />
+          <Route path="/super-admin/my-products/:id/view" element={<ViewProduct />} />
           <Route path="/super-admin/orders" element={<OrdersManagement />} />
           <Route path="/super-admin/categories" element={<Categories />} />
           <Route path="/super-admin/payouts" element={<PayoutsManagement />} />
@@ -162,7 +173,13 @@ function App() {
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/sellers" element={<SellerManagement />} />
           <Route path="/admin/products" element={<ProductsManagement />} />
+          <Route path="/admin/products/create" element={<CreateProduct />} />
+          <Route path="/admin/products/:id/edit" element={<EditProduct />} />
+          <Route path="/admin/products/:id/view" element={<ViewProduct />} />
           <Route path="/admin/my-products" element={<ProductsManagement />} />
+          <Route path="/admin/my-products/create" element={<CreateProduct />} />
+          <Route path="/admin/my-products/:id/edit" element={<EditProduct />} />
+          <Route path="/admin/my-products/:id/view" element={<ViewProduct />} />
           <Route path="/admin/orders" element={<OrdersManagement />} />
           <Route path="/admin/categories" element={<Categories />} />
           <Route path="/admin/payouts" element={<PayoutsManagement />} />
@@ -183,7 +200,12 @@ function App() {
         >
           <Route path="/seller" element={<SellerDashboard />} />
           <Route path="/seller/inventory" element={<SellerInventory />} />
+          <Route path="/seller/inventory/:id/edit" element={<EditProduct />} />
+          <Route path="/seller/inventory/:id/view" element={<ViewProduct />} />
           <Route path="/seller/products" element={<ProductsManagement />} />
+          <Route path="/seller/products/create" element={<CreateProduct />} />
+          <Route path="/seller/products/:id/edit" element={<EditProduct />} />
+          <Route path="/seller/products/:id/view" element={<ViewProduct />} />
           <Route path="/seller/orders" element={<OrdersManagement />} />
           <Route path="/seller/payouts" element={<PayoutsManagement />} />
           <Route path="/seller/coupons" element={<ListCoupon />} />
