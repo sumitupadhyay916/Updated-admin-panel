@@ -198,7 +198,6 @@ export default function Profile() {
                 <span className="flex items-center justify-center sm:justify-start gap-1.5">
                   <Mail className="h-3.5 w-3.5" /> {user?.email}
                 </span>
-                <span className="text-xs">Member since {memberSince}</span>
               </div>
             </div>
           </div>
@@ -362,11 +361,10 @@ export default function Profile() {
                   <dd><Badge variant="outline" className="text-green-600 border-green-300 text-xs">Active</Badge></dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground mb-1">User ID</dt>
+                  <dt className="text-muted-foreground mb-1">ID</dt>
                   <dd className="font-mono text-xs text-muted-foreground">{user?.id?.slice(0, 12)}…</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground mb-1">Member Since</dt>
                   <dd>{memberSince}</dd>
                 </div>
               </dl>

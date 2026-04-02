@@ -8,8 +8,8 @@ import type {
 // API base URL — dev on localhost always hits local API (ignore prod URL in .env)
 const API_BASE_URL =
   import.meta.env.DEV &&
-  typeof window !== "undefined" &&
-  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
     ? "http://localhost:5000/api"
     : import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -135,12 +135,12 @@ export const authApi = {
 
   activateSeller: async (data: { token: string; password: string }): Promise<ApiResponse<{ user: any; token: string }>> => {
     const response = await apiClient.post('/auth/activate-seller', data);
-    
+
     // Save token to sessionStorage if activation successful
     if (response.data.success && response.data.data?.token) {
       sessionStorage.setItem('token', response.data.data.token);
     }
-    
+
     return response.data;
   },
 
@@ -358,9 +358,9 @@ export interface UpdateProductRequest {
   subcategoryId?: number | null;
   hasVariants?: boolean;
   variants?: Array<{
-    size?: string;
+    attributes?: Record<string, string>;
     color?: string;
-    quality?: string;
+    colorHex?: string;
     price: number;
     mrp: number;
     stockQuantity: number;

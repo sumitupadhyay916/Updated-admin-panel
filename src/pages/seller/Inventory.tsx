@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatCard } from '@/components/ui/stat-card';
 import { Button } from '@/components/ui/button';
@@ -42,8 +43,6 @@ import {
 } from 'lucide-react';
 import { productsApi } from '@/services/api';
 import { CartDetailsModal } from '@/components/inventory/CartDetailsModal';
-import { EditProductModal } from '@/components/inventory/EditProductModal';
-import { ViewProductModal } from '@/components/inventory/ViewProductModal';
 
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -163,6 +162,7 @@ function DeleteProductDialog({
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 export default function SellerInventory() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<InventoryStats>({
     totalProducts: 0,
     totalStockQuantity: 0,
@@ -185,14 +185,6 @@ export default function SellerInventory() {
   const [stockFilter, setStockFilter] = useState<string>('all');
   const [cartModalOpen, setCartModalOpen] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{
-    open: boolean;
-    product: Product | null;
-  }>({ open: false, product: null });
-  const [editDialog, setEditDialog] = useState<{
-    open: boolean;
-    product: Product | null;
-  }>({ open: false, product: null });
-  const [viewDialog, setViewDialog] = useState<{
     open: boolean;
     product: Product | null;
   }>({ open: false, product: null });
@@ -302,15 +294,8 @@ export default function SellerInventory() {
   };
 
   // ─── Handle Pagination ──────────────────────────────────────────────────────
-
   const handlePageChange = (newPage: number) => {
     setMeta((prev) => ({ ...prev, page: newPage }));
-  };
-
-  // ─── Handle Modal Success ───────────────────────────────────────────────────
-
-  const handleModalSuccess = async () => {
-    await Promise.all([fetchStats(), fetchProducts()]);
   };
 
   // ─── Render ─────────────────────────────────────────────────────────────────
@@ -473,7 +458,7 @@ export default function SellerInventory() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                onClick={() => setViewDialog({ open: true, product })}
+                                onClick={() => navigate(`/seller/inventory/${product.id}/view`)}
                                 title="View Details"
                               >
                                 <Eye className="h-4 w-4" />
@@ -482,7 +467,7 @@ export default function SellerInventory() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                                onClick={() => setEditDialog({ open: true, product })}
+                                onClick={() => navigate(`/seller/inventory/${product.id}/edit`)}
                                 title="Edit Product"
                               >
                                 <Edit className="h-4 w-4" />
@@ -549,19 +534,6 @@ export default function SellerInventory() {
         open={deleteDialog.open}
         onClose={() => setDeleteDialog({ open: false, product: null })}
         onConfirm={handleDelete}
-      />
-
-      <EditProductModal
-        product={editDialog.product}
-        open={editDialog.open}
-        onClose={() => setEditDialog({ open: false, product: null })}
-        onSuccess={handleModalSuccess}
-      />
-
-      <ViewProductModal
-        product={viewDialog.product}
-        open={viewDialog.open}
-        onClose={() => setViewDialog({ open: false, product: null })}
       />
 
       <CartDetailsModal
