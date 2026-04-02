@@ -19,8 +19,10 @@ import { staffApi } from '@/services/api';
 // Define typical permissions for a seller's staff
 const AVAILABLE_PERMISSIONS = [
   { id: 'manage_products', label: 'Manage Products' },
+  { id: 'manage_categories', label: 'Manage Categories' },
   { id: 'manage_orders', label: 'Manage Orders' },
   { id: 'manage_inventory', label: 'Manage Inventory' },
+  { id: 'manage_abandoned_carts', label: 'Manage Abandoned Carts' },
   { id: 'manage_coupons', label: 'Manage Coupons' },
   { id: 'manage_payouts', label: 'View Payouts' },
 ];
@@ -223,8 +225,8 @@ export default function StaffManagement() {
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-1 w-48">
                         {member.permissions?.map((perm: string) => (
-                          <Badge key={perm} variant="outline" className="text-[10px]">
-                            {perm.replace('manage_', '')}
+                          <Badge key={perm} variant="outline" className="text-[10px] capitalize">
+                            {perm.replace('manage_', '').replace(/_/g, ' ')}
                           </Badge>
                         ))}
                         {(!member.permissions || member.permissions.length === 0) && (
