@@ -1,6 +1,8 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import type { User, UserRole, LoginCredentials, SuperAdmin, Admin } from '@/types';
+import { persist, createJSONStorage } from 'zustand/middleware';
+// UserRole is probably missing 'staff', but this is just an example of modifying imports if needed.
+import type { User, UserRole as BaseUserRole, LoginCredentials } from '@/types';
+type UserRole = BaseUserRole | 'staff';
 import { authApi } from '@/services/api';
 
 interface AuthState {
@@ -29,6 +31,9 @@ const routeAccessRules: Record<UserRole, string[]> = {
   seller: [
     '/seller',
   ],
+  staff: [
+    '/seller',
+  ],
   consumer: [
     '/consumer',
   ],
@@ -44,23 +49,29 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (credentials: LoginCredentials): Promise<boolean> => {
         set({ isLoading: true });
-        
+
         try {
           const response = await authApi.login({
             email: credentials.email,
             password: credentials.password,
             role: credentials.role,
           });
-          
+
           if (response.success && response.data) {
             const { user, token } = response.data as { user: User; token: string };
-            
+
             // Check if role matches (if specified)
-            if (credentials.role && user.role !== credentials.role) {
-              set({ isLoading: false });
-              return false;
+            if (credentials.role) {
+              if (credentials.role === 'staff' && user.role === 'staff') {
+                // Allow staff directly 
+              } else if (credentials.role === 'seller' && user.role === 'staff') {
+                // Allow staff to login via the seller portal
+              } else if (user.role !== credentials.role) {
+                set({ isLoading: false });
+                return false;
+              }
             }
-            
+
             set({
               user,
               token,
@@ -69,7 +80,7 @@ export const useAuthStore = create<AuthState>()(
             });
             return true;
           }
-          
+
           set({ isLoading: false });
           return false;
         } catch (error) {
@@ -102,11 +113,16 @@ export const useAuthStore = create<AuthState>()(
       hasPermission: (permission: string): boolean => {
         const { user } = get();
         if (!user) return false;
-        
+
         if (user.role === 'super_admin') return true;
-        if ('permissions' in user && Array.isArray((user as SuperAdmin | Admin).permissions)) {
-          return (user as SuperAdmin | Admin).permissions.includes(permission) || 
-                 (user as SuperAdmin | Admin).permissions.includes('all');
+        
+        // Both admins and staff can have permissions arrays
+        if (['admin', 'staff'].includes(user.role)) {
+          const userWithPerms = user as any;
+          if (Array.isArray(userWithPerms.permissions)) {
+            return userWithPerms.permissions.includes(permission) ||
+                   userWithPerms.permissions.includes('all');
+          }
         }
         return false;
       },
@@ -114,15 +130,16 @@ export const useAuthStore = create<AuthState>()(
       canAccessRoute: (route: string): boolean => {
         const { user } = get();
         if (!user) return false;
-        
+
         const allowedRoutes = routeAccessRules[user.role] || [];
         return allowedRoutes.some(allowedRoute => route.startsWith(allowedRoute));
       },
     }),
     {
       name: 'auth-storage',
-      partialize: (state) => ({ 
-        user: state.user, 
+      storage: createJSONStorage(() => sessionStorage),
+      partialize: (state) => ({
+        user: state.user,
         isAuthenticated: state.isAuthenticated,
         token: state.token,
       }),
@@ -138,6 +155,7 @@ export const useRole = () => {
     isSuperAdmin: user?.role === 'super_admin',
     isAdmin: user?.role === 'admin',
     isSeller: user?.role === 'seller',
+    isStaff: user?.role === 'staff',
     isConsumer: user?.role === 'consumer',
   };
 };

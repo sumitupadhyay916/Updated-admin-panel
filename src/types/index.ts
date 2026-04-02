@@ -2,7 +2,7 @@
 // ROLE & USER TYPES
 // ============================================
 
-export type UserRole = 'super_admin' | 'admin' | 'seller' | 'consumer';
+export type UserRole = 'super_admin' | 'admin' | 'seller' | 'consumer' | 'staff';
 
 export interface User {
   id: string;
@@ -48,6 +48,8 @@ export interface Seller extends User {
     email: string;
     role: UserRole;
   };
+  productCount?: number;
+  orderCount?: number;
 }
 
 export interface Consumer extends User {
@@ -75,19 +77,26 @@ export interface Address {
 // PRODUCT TYPES
 // ============================================
 
-export type Deity = 'Ganesh' | 'Krishna' | 'Shiva' | 'Durga' | 'Lakshmi' | 'Saraswati' | 'Hanuman' | 'Ram' | 'Vishnu' | 'Kali' | 'Other';
+// export type Deity = 'Ganesh' | 'Krishna' | 'Shiva' | 'Durga' | 'Lakshmi' | 'Saraswati' | 'Hanuman' | 'Ram' | 'Vishnu' | 'Kali' | 'Other';
 export type Material = 'Brass' | 'Marble' | 'Resin' | 'Clay' | 'Silver' | 'Wood' | 'Gold' | 'Panchdhatu' | 'Copper';
-export type ReligionCategory = 'Hindu' | 'Buddhist' | 'Jain' | 'Sikh' | 'Universal';
-export type PackagingType = 'Box' | 'Velvet Box' | 'Wooden Case' | 'Gift Wrap' | 'Standard';
-export type Occasion = 'Diwali' | 'Puja' | 'Wedding' | 'Festival' | 'Housewarming' | 'Birthday' | 'Anniversary' | 'Corporate' | 'Daily Worship' | 'Tuesday Special' | 'Navratri' | 'Ganesh Chaturthi' | 'Vasant Panchami';
+// export type ReligionCategory = 'Hindu' | 'Buddhist' | 'Jain' | 'Sikh' | 'Universal';
+// export type PackagingType = 'Box' | 'Velvet Box' | 'Wooden Case' | 'Gift Wrap' | 'Standard';
+// export type Occasion = 'Diwali' | 'Puja' | 'Wedding' | 'Festival' | 'Housewarming' | 'Birthday' | 'Anniversary' | 'Corporate' | 'Daily Worship' | 'Tuesday Special' | 'Navratri' | 'Ganesh Chaturthi' | 'Vasant Panchami';
 
 export interface Category {
   id: number;
   cid: string;
   name: string;
+  slug: string;
+  imageUrl?: string;
+  description?: string;
   status: 'active' | 'inactive';
   noOfProducts: number;
   productCount: number;
+  createdBy?: {
+    name: string;
+    email: string;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -97,29 +106,62 @@ export interface Product {
   pid: string;
   name: string;
   description: string;
-  deity: Deity;
+  // deity: Deity;
   material: Material;
   height: number;
   weight: number;
   handcrafted: boolean;
-  occasion: Occasion[];
-  religionCategory: ReligionCategory;
-  packagingType: PackagingType;
-  fragile: boolean;
+  // occasion: Occasion[];
+  // religionCategory: ReligionCategory;
+  // packagingType: PackagingType;
+  // fragile: boolean;
   price: number;
   comparePrice?: number;
   stock: 'available' | 'unavailable';
+  stockQuantity: number;
   lowStockThreshold: number;
   images: string[];
   reviewCount: number;
+  averageRating: number;
   sellerId: string;
   sellerName: string;
   categoryId: number;
   categoryName: string;
+  subcategoryId: number | null;
+  subcategorySlug: string | null;
   isFeatured: boolean;
   tags: string[];
+  options: ProductOption[];
+  variants: ProductVariant[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProductOption {
+  id: string;
+  name: string;
+  values: ProductOptionValue[];
+}
+
+export interface ProductOptionValue {
+  id: string;
+  value: string;
+}
+
+export interface ProductVariant {
+  id: string;
+  price: number;
+  comparePrice?: number;
+  stock: number;
+  images: string[];
+  optionValues: VariantOptionValueMapping[];
+}
+
+export interface VariantOptionValueMapping {
+  optionId: string;
+  optionName: string;
+  valueId: string;
+  value: string;
 }
 
 // ============================================
@@ -153,15 +195,18 @@ export interface OrderItem {
   productId: string;
   productName: string;
   productImage: string;
-  deity: Deity;
+  // deity: Deity;
   material: Material;
   height: number;
   weight: number;
-  packagingType: PackagingType;
-  fragile: boolean;
+  // packagingType: PackagingType;
+  //fragile: boolean;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  variantId?: string;
+  color?: string;
+  size?: string;
   sellerId: string;
   sellerName: string;
 }
@@ -367,9 +412,7 @@ export interface DashboardStats {
   lowStockProducts: number;
   pendingPayouts: number;
   openQueries: number;
-  revenueChange: number;
-  ordersChange: number;
-  customersChange: number;
+  totalCategories: number;
 }
 
 export interface ChartData {

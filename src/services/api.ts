@@ -4,16 +4,14 @@ import type {
   InternalAxiosRequestConfig,
   AxiosError,
 } from "axios";
-import type { User, UserRole, SuperAdmin } from "@/types";
-import { mockAdmins, mockSellers } from "@/services/mockData";
 
-// Toggle this flag via env to switch between mock auth and real backend auth
-// Defaults to real backend when not explicitly set
-const USE_MOCK_AUTH = import.meta.env.VITE_USE_MOCK_AUTH === "true";
-
-// API base URL
+// API base URL — dev on localhost always hits local API (ignore prod URL in .env)
 const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  import.meta.env.DEV &&
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+    ? "http://localhost:5000/api"
+    : import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -27,7 +25,7 @@ const apiClient: AxiosInstance = axios.create({
 // Request interceptor - add auth token
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -42,8 +40,8 @@ apiClient.interceptors.response.use(
   (error: AxiosError) => {
     if (error.response?.status === 401) {
       // Token expired or invalid - logout user
-      localStorage.removeItem("token");
-      localStorage.removeItem("auth-storage");
+      sessionStorage.removeItem("token");
+      sessionStorage.removeItem("auth-storage");
       window.location.href = "/login";
     }
     return Promise.reject(error);
@@ -98,91 +96,11 @@ export interface ChangePasswordRequest {
   newPassword: string;
 }
 
-// ============================================
-// MOCK AUTH IMPLEMENTATION
-// ============================================
-
-const mockSuperAdmin: SuperAdmin = {
-  id: "sa-001",
-  email: "super@divine.com",
-  name: "Super Admin",
-  role: "super_admin",
-  avatar:
-    "https://api.dicebear.com/7.x/avataaars/svg?seed=super-admin",
-  phone: "+91-9876543210",
-  status: "active",
-  createdAt: "2024-01-01",
-  updatedAt: "2024-01-01",
-  permissions: [
-    "manage_sellers",
-    "manage_products",
-    "manage_orders",
-    "view_reports",
-    "all",
-  ],
-};
-
-type MockAuthUser = {
-  email: string;
-  password: string;
-  role: UserRole;
-  user: User;
-};
-
-const mockAuthUsers: MockAuthUser[] = [
-  {
-    email: "super@divine.com",
-    password: "admin123",
-    role: "super_admin",
-    user: mockSuperAdmin,
-  },
-  {
-    email: "admin@divine.com",
-    password: "admin123",
-    role: "admin",
-    user: mockAdmins[0] as User,
-  },
-  {
-    email: "seller@divine.com",
-    password: "seller123",
-    role: "seller",
-    user: mockSellers[0] as User,
-  },
-];
-
 export const authApi = {
   login: async (data: LoginRequest): Promise<ApiResponse<{ user: unknown; token: string }>> => {
-    if (USE_MOCK_AUTH) {
-      const match = mockAuthUsers.find(
-        (u) =>
-          u.email === data.email &&
-          u.password === data.password &&
-          (!data.role || u.role === data.role),
-      );
-
-      if (!match) {
-        return {
-          success: false,
-          message: "Invalid credentials",
-        };
-      }
-
-      const token = `mock-token-${match.user.id}`;
-      localStorage.setItem("token", token);
-
-      return {
-        success: true,
-        message: "Login successful",
-        data: {
-          user: match.user,
-          token,
-        },
-      };
-    }
-
     const response = await apiClient.post("/auth/login", data);
     if (response.data.success && response.data.data?.token) {
-      localStorage.setItem("token", response.data.data.token);
+      sessionStorage.setItem("token", response.data.data.token);
     }
     return response.data;
   },
@@ -190,7 +108,7 @@ export const authApi = {
   register: async (data: RegisterRequest): Promise<ApiResponse<{ user: unknown; token: string }>> => {
     const response = await apiClient.post('/auth/register', data);
     if (response.data.success && response.data.data?.token) {
-      localStorage.setItem('token', response.data.data.token);
+      sessionStorage.setItem('token', response.data.data.token);
     }
     return response.data;
   },
@@ -200,14 +118,35 @@ export const authApi = {
     return response.data;
   },
 
+  updateProfile: async (data: { name?: string; phone?: string; avatar?: string }): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.put('/auth/profile', data);
+    return response.data;
+  },
+
   changePassword: async (data: ChangePasswordRequest): Promise<ApiResponse<null>> => {
     const response = await apiClient.post('/auth/change-password', data);
     return response.data;
   },
 
   logout: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('auth-storage');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('auth-storage');
+  },
+
+  activateSeller: async (data: { token: string; password: string }): Promise<ApiResponse<{ user: any; token: string }>> => {
+    const response = await apiClient.post('/auth/activate-seller', data);
+
+    // Save token to sessionStorage if activation successful
+    if (response.data.success && response.data.data?.token) {
+      sessionStorage.setItem('token', response.data.data.token);
+    }
+
+    return response.data;
+  },
+
+  verifyActivationToken: async (token: string): Promise<ApiResponse<{ email: string; name: string }>> => {
+    const response = await apiClient.get('/auth/verify-activation-token', { params: { token } });
+    return response.data;
   },
 };
 
@@ -269,14 +208,14 @@ export const usersApi = {
 
 export interface CreateSellerRequest {
   email: string;
-  password: string;
+  password?: string;
   name: string;
   phone?: string;
   businessName: string;
   businessAddress: string;
   gstNumber?: string;
   commissionRate?: number;
-  adminEmail: string;
+  adminEmail?: string; // Made optional
 }
 
 export interface UpdateSellerRequest {
@@ -357,6 +296,27 @@ export interface CreateProductRequest {
   price: number;
   stock?: 'available' | 'unavailable';
   sellerId?: string;
+  hasVariants?: boolean;
+  variants?: Array<{
+    size?: string;
+    color?: string;
+    quality?: string;
+    price: number;
+    mrp: number;
+    stockQuantity: number;
+    images?: string[];
+  }>;
+  brand?: string;
+  care?: string;
+  materials?: string;
+  ageGroups?: string[];
+  isNew?: boolean;
+  isBestseller?: boolean;
+  dimensions?: {
+    h: number;
+    l: number;
+    w: number;
+  };
   // Optional fields for full product creation
   deity?: string;
   material?: string;
@@ -372,6 +332,7 @@ export interface CreateProductRequest {
   lowStockThreshold?: number;
   images?: string[];
   tags?: string[];
+  subcategoryId?: number | null;
 }
 
 export interface UpdateProductRequest {
@@ -394,15 +355,37 @@ export interface UpdateProductRequest {
   images?: string[];
   tags?: string[];
   isFeatured?: boolean;
+  subcategoryId?: number | null;
+  hasVariants?: boolean;
+  variants?: Array<{
+    attributes?: Record<string, string>;
+    color?: string;
+    colorHex?: string;
+    price: number;
+    mrp: number;
+    stockQuantity: number;
+    images?: string[];
+  }>;
+  brand?: string;
+  care?: string;
+  materials?: string;
+  ageGroups?: string[];
+  isNew?: boolean;
+  isBestseller?: boolean;
+  dimensions?: {
+    h: number;
+    l: number;
+    w: number;
+  };
 }
 
 
 export const productsApi = {
-  getProducts: async (params?: PaginationParams & { 
-    deity?: string; 
-    material?: string; 
-    minPrice?: number; 
-    maxPrice?: number; 
+  getProducts: async (params?: PaginationParams & {
+    deity?: string;
+    material?: string;
+    minPrice?: number;
+    maxPrice?: number;
     status?: string;
     sellerId?: string;
     isFeatured?: boolean;
@@ -460,7 +443,60 @@ export const productsApi = {
     const response = await apiClient.get('/products/pending', { params });
     return response.data;
   },
+
+  uploadImage: async (file: File): Promise<ApiResponse<{ url: string }>> => {
+    const formData = new FormData();
+    formData.append('image', file);
+    const response = await apiClient.post('/products/upload-image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  // Inventory management endpoints
+  getInventoryStats: async (): Promise<ApiResponse<{
+    totalProducts: number;
+    totalStockQuantity: number;
+    deliveredQuantity: number;
+    reservedQuantity: number;
+    shippingQuantity: number;
+    lowStockProducts: number;
+  }>> => {
+    const response = await apiClient.get('/products/inventory/stats');
+    return response.data;
+  },
+
+  getCartDetails: async (): Promise<ApiResponse<Array<{
+    productId: number;
+    productPid: string;
+    productName: string;
+    productImage: string | null;
+    productPrice: number;
+    reservedQuantity: number;
+    numberOfCarts: number;
+    carts: Array<{
+      cartId: string;
+      userId: string;
+      quantity: number;
+      addedAt: string;
+      updatedAt: string;
+    }>;
+  }>>> => {
+    const response = await apiClient.get('/products/inventory/cart-details');
+    return response.data;
+  },
+
+  getProductInventoryDetails: async (id: string | number): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.get(`/products/${id}/inventory-details`);
+    return response.data;
+  },
+
+  adjustProductStock: async (id: string | number, data: { adjustment?: number; variantAdjustments?: Array<{ variantId: string; adjustment: number }> }): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.post(`/products/${id}/adjust-stock`, data);
+    return response.data;
+  },
 };
+
 
 // ============================================
 // ORDERS API
@@ -489,8 +525,8 @@ export interface UpdateOrderStatusRequest {
 }
 
 export const ordersApi = {
-  getOrders: async (params?: PaginationParams & { 
-    status?: string; 
+  getOrders: async (params?: PaginationParams & {
+    status?: string;
     paymentStatus?: string;
     sellerId?: string;
     customerId?: string;
@@ -581,18 +617,24 @@ export const payoutsApi = {
 // ============================================
 
 export interface CreateCouponRequest {
+  title: string;
   code: string;
   description: string;
   discountType: string;
   discountValue: number;
   minOrderAmount?: number;
   maxDiscountAmount?: number;
+  maxSpend?: number;
+  isFreeShipping?: boolean;
   usageLimit?: number;
+  limitPerUser?: number;
   startDate: string;
   endDate: string;
   applicableTo?: string;
   sellerIds?: string[];
   productIds?: string[];
+  categoryIds?: number[];
+  isActive?: boolean;
 }
 
 export const couponsApi = {
@@ -814,6 +856,238 @@ export const supportApi = {
     const response = await apiClient.put('/support/settings', data);
     return response.data;
   },
+};
+
+export interface AbandonedCartItem {
+  id: string;
+  productId?: number | null;
+  productName: string;
+  productImage?: string | null;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export interface AbandonedCart {
+  id: string;
+  cartNumber: string;
+  customerId?: string | null;
+  customerName: string;
+  customerEmail: string;
+  customerPhone?: string | null;
+  sellerId: string;
+  cartValue: number;
+  itemCount: number;
+  status: 'abandoned' | 'recovered' | 'expired';
+  emailStatus: 'not_sent' | 'sent' | 'opened';
+  recoveredAt?: string | null;
+  reminderSentAt?: string | null;
+  couponCode?: string | null;
+  notes?: string | null;
+  items: AbandonedCartItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AbandonedCartStats {
+  totalCarts: number;
+  recoveredCarts: number;
+  totalPotentialRevenue: number;
+  recoveryRate: number;
+}
+
+export interface AbandonedCartsListResponse {
+  success: boolean;
+  message: string;
+  data: AbandonedCart[];
+  stats: AbandonedCartStats;
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
+
+export const abandonedCartsApi = {
+  list: async (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<AbandonedCartsListResponse> => {
+    const response = await apiClient.get('/abandoned-carts', { params });
+    return response.data;
+  },
+
+  get: async (id: string): Promise<ApiResponse<AbandonedCart>> => {
+    const response = await apiClient.get(`/abandoned-carts/${id}`);
+    return response.data;
+  },
+
+  create: async (data: {
+    customerName: string;
+    customerEmail: string;
+    customerPhone?: string;
+    customerId?: string;
+    items: Omit<AbandonedCartItem, 'id'>[];
+    notes?: string;
+  }): Promise<ApiResponse<AbandonedCart>> => {
+    const response = await apiClient.post('/abandoned-carts', data);
+    return response.data;
+  },
+
+  update: async (
+    id: string,
+    data: {
+      status?: 'abandoned' | 'recovered' | 'expired';
+      emailStatus?: 'not_sent' | 'sent' | 'opened';
+      couponCode?: string;
+      notes?: string;
+    }
+  ): Promise<ApiResponse<AbandonedCart>> => {
+    const response = await apiClient.put(`/abandoned-carts/${id}`, data);
+    return response.data;
+  },
+
+  delete: async (id: string): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete(`/abandoned-carts/${id}`);
+    return response.data;
+  },
+
+  sendReminder: async (id: string): Promise<ApiResponse<AbandonedCart>> => {
+    const response = await apiClient.post(`/abandoned-carts/${id}/send-reminder`);
+    return response.data;
+  },
+
+  markExpired: async (id: string): Promise<ApiResponse<AbandonedCart>> => {
+    const response = await apiClient.post(`/abandoned-carts/${id}/mark-expired`);
+    return response.data;
+  },
+};
+
+// ============================================
+// SELLER POLICIES API
+// ============================================
+
+export interface SellerPolicyData {
+  privacyPolicy?: string;
+  termsConditions?: string;
+}
+
+export interface SellerFAQData {
+  question: string;
+  answer: string;
+  category?: string;
+  order?: number;
+}
+
+export const sellerPoliciesApi = {
+  // ── Seller (authenticated) ────────────────────────────────────────────────
+  getMyPolicies: async (): Promise<ApiResponse<SellerPolicyData>> => {
+    const response = await apiClient.get('/seller-policies/my');
+    return response.data;
+  },
+
+  updateMyPolicies: async (data: SellerPolicyData): Promise<ApiResponse<SellerPolicyData>> => {
+    const response = await apiClient.put('/seller-policies/my', data);
+    return response.data;
+  },
+
+  getMyFAQs: async (): Promise<ApiResponse<unknown[]>> => {
+    const response = await apiClient.get('/seller-policies/my/faqs');
+    return response.data;
+  },
+
+  createFAQ: async (data: SellerFAQData): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.post('/seller-policies/my/faqs', data);
+    return response.data;
+  },
+
+  updateFAQ: async (id: string, data: Partial<SellerFAQData>): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.put(`/seller-policies/my/faqs/${id}`, data);
+    return response.data;
+  },
+
+  deleteFAQ: async (id: string): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete(`/seller-policies/my/faqs/${id}`);
+    return response.data;
+  },
+
+  // ── Public (no auth) ─────────────────────────────────────────────────────
+  getPublicPolicies: async (sellerId: string): Promise<ApiResponse<SellerPolicyData>> => {
+    const response = await apiClient.get(`/seller-policies/public/${sellerId}`);
+    return response.data;
+  },
+
+  getPublicFAQs: async (sellerId: string): Promise<ApiResponse<unknown[]>> => {
+    const response = await apiClient.get(`/seller-policies/public/${sellerId}/faqs`);
+    return response.data;
+  },
+};
+
+// ── Subcategories API ────────────────────────────────────────────────────────
+
+export interface Subcategory {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  categoryId: number;
+  category?: { id: number; name: string; slug: string | null };
+}
+
+export const subcategoriesApi = {
+  getAll: async (): Promise<ApiResponse<Subcategory[]>> => {
+    const response = await apiClient.get('/subcategories');
+    return response.data;
+  },
+
+  getByCategory: async (categoryId: number): Promise<ApiResponse<Subcategory[]>> => {
+    const response = await apiClient.get(`/subcategories?categoryId=${categoryId}`);
+    return response.data;
+  },
+
+  create: async (data: { name: string; slug: string; categoryId: number; description?: string }): Promise<ApiResponse<Subcategory>> => {
+    const response = await apiClient.post('/subcategories', data);
+    return response.data;
+  },
+
+  update: async (id: number, data: Partial<{ name: string; slug: string; categoryId: number; description: string }>): Promise<ApiResponse<Subcategory>> => {
+    const response = await apiClient.put(`/subcategories/${id}`, data);
+    return response.data;
+  },
+
+  delete: async (id: number): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete(`/subcategories/${id}`);
+    return response.data;
+  },
+};
+
+export const staffApi = {
+  getStaff: async (): Promise<ApiResponse<unknown[]>> => {
+    const response = await apiClient.get('/staff');
+    return response.data;
+  },
+
+  createStaff: async (data: any): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.post('/staff', data);
+    return response.data;
+  },
+
+  updateStaff: async (id: string, data: any): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.put(`/staff/${id}`, data);
+    return response.data;
+  },
+
+  deleteStaff: async (id: string): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete(`/staff/${id}`);
+    return response.data;
+  }
 };
 
 export default apiClient;

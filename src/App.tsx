@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { Layout, AuthLayout } from '@/components/layout/Layout';
@@ -5,6 +6,10 @@ import { Toaster } from '@/components/ui/sonner';
 
 // Auth Pages
 import Login from '@/pages/auth/Login';
+import ActivateSeller from '@/pages/auth/ActivateSeller';
+
+// Shared Pages
+import Profile from '@/pages/shared/Profile';
 
 // Super Admin Pages
 import SuperAdminDashboard from '@/pages/super-admin/Dashboard';
@@ -21,6 +26,17 @@ import AdminDashboard from '@/pages/admin/Dashboard';
 
 // Seller Pages
 import SellerDashboard from '@/pages/seller/Dashboard';
+import ListCoupon from '@/pages/seller/Coupons/ListCoupon';
+import CreateCoupon from '@/pages/seller/Coupons/CreateCoupon';
+import AbandonedCarts from '@/pages/seller/AbandonedCarts';
+import SellerSupportPages from '@/pages/seller/SellerSupportPages';
+import SellerInventory from '@/pages/seller/Inventory';
+import StaffManagement from '@/pages/seller/staff/StaffManagement';
+
+// Product Pages
+import CreateProduct from '@/pages/products/CreateProduct';
+import EditProduct from '@/pages/products/EditProduct';
+import ViewProduct from '@/pages/products/ViewProduct';
 
 // Protected Route Component
 function ProtectedRoute({ 
@@ -31,7 +47,7 @@ function ProtectedRoute({
   allowedRoles: string[];
 }) {
   const { isAuthenticated, user } = useAuthStore();
-
+  
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
@@ -44,6 +60,7 @@ function ProtectedRoute({
       case 'admin':
         return <Navigate to="/admin" replace />;
       case 'seller':
+      case 'staff':
         return <Navigate to="/seller" replace />;
       default:
         return <Navigate to="/login" replace />;
@@ -56,7 +73,7 @@ function ProtectedRoute({
 // Public Route - redirects to dashboard if already logged in
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user } = useAuthStore();
-
+  
   if (isAuthenticated) {
     switch (user?.role) {
       case 'super_admin':
@@ -64,6 +81,8 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
       case 'admin':
         return <Navigate to="/admin" replace />;
       case 'seller':
+        return <Navigate to="/seller" replace />;
+      case 'staff':
         return <Navigate to="/seller" replace />;
       default:
         return <Navigate to="/login" replace />;
@@ -74,6 +93,26 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  const { isAuthenticated, fetchProfile } = useAuthStore();
+  
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    
+    if (isAuthenticated) {
+      // Call immediately on mount/refresh to ensure latest permissions
+      fetchProfile();
+      
+      // Poll profile every 30 seconds to update permissions if seller changed them
+      interval = setInterval(() => {
+        fetchProfile();
+      }, 30000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isAuthenticated, fetchProfile]);
+
   return (
     <BrowserRouter>
       <Routes>
@@ -84,6 +123,14 @@ function App() {
             element={
               <PublicRoute>
                 <Login />
+              </PublicRoute>
+            } 
+          />
+          <Route 
+            path="/activate-seller" 
+            element={
+              <PublicRoute>
+                <ActivateSeller />
               </PublicRoute>
             } 
           />
@@ -101,12 +148,19 @@ function App() {
           <Route path="/super-admin/admins" element={<AdminManagement />} />
           <Route path="/super-admin/sellers" element={<SellerManagement />} />
           <Route path="/super-admin/products" element={<ProductsManagement />} />
+          <Route path="/super-admin/products/create" element={<CreateProduct />} />
+          <Route path="/super-admin/products/:id/edit" element={<EditProduct />} />
+          <Route path="/super-admin/products/:id/view" element={<ViewProduct />} />
           <Route path="/super-admin/my-products" element={<ProductsManagement />} />
+          <Route path="/super-admin/my-products/create" element={<CreateProduct />} />
+          <Route path="/super-admin/my-products/:id/edit" element={<EditProduct />} />
+          <Route path="/super-admin/my-products/:id/view" element={<ViewProduct />} />
           <Route path="/super-admin/orders" element={<OrdersManagement />} />
           <Route path="/super-admin/categories" element={<Categories />} />
           <Route path="/super-admin/payouts" element={<PayoutsManagement />} />
           <Route path="/super-admin/support-pages" element={<SupportPages />} />
           <Route path="/super-admin/support-pages/:slug" element={<SupportPages />} />
+          <Route path="/super-admin/profile" element={<Profile />} />
         </Route>
 
         {/* Admin Routes */}
@@ -120,28 +174,54 @@ function App() {
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/sellers" element={<SellerManagement />} />
           <Route path="/admin/products" element={<ProductsManagement />} />
+          <Route path="/admin/products/create" element={<CreateProduct />} />
+          <Route path="/admin/products/:id/edit" element={<EditProduct />} />
+          <Route path="/admin/products/:id/view" element={<ViewProduct />} />
           <Route path="/admin/my-products" element={<ProductsManagement />} />
+          <Route path="/admin/my-products/create" element={<CreateProduct />} />
+          <Route path="/admin/my-products/:id/edit" element={<EditProduct />} />
+          <Route path="/admin/my-products/:id/view" element={<ViewProduct />} />
           <Route path="/admin/orders" element={<OrdersManagement />} />
           <Route path="/admin/categories" element={<Categories />} />
           <Route path="/admin/payouts" element={<PayoutsManagement />} />
           <Route path="/admin/support-pages" element={<SupportPages />} />
           <Route path="/admin/support-pages/:slug" element={<SupportPages />} />
+          <Route path="/admin/coupons" element={<ListCoupon />} />
+          <Route path="/admin/coupons/create" element={<CreateCoupon />} />
+          <Route path="/admin/profile" element={<Profile />} />
         </Route>
 
-        {/* Seller Routes */}
+        {/* Seller & Staff Routes */}
         <Route 
           element={
-            <ProtectedRoute allowedRoles={['super_admin', 'admin', 'seller']}>
+            <ProtectedRoute allowedRoles={['super_admin', 'admin', 'seller', 'staff']}>
               <Layout />
             </ProtectedRoute>
           }
         >
           <Route path="/seller" element={<SellerDashboard />} />
+          <Route path="/seller/inventory" element={<SellerInventory />} />
+          <Route path="/seller/inventory/:id/edit" element={<EditProduct />} />
+          <Route path="/seller/inventory/:id/view" element={<ViewProduct />} />
           <Route path="/seller/products" element={<ProductsManagement />} />
+          <Route path="/seller/products/create" element={<CreateProduct />} />
+          <Route path="/seller/products/:id/edit" element={<EditProduct />} />
+          <Route path="/seller/products/:id/view" element={<ViewProduct />} />
           <Route path="/seller/orders" element={<OrdersManagement />} />
+          <Route path="/seller/categories" element={<Categories />} />
           <Route path="/seller/payouts" element={<PayoutsManagement />} />
-          <Route path="/seller/support-pages" element={<SupportPages />} />
-          <Route path="/seller/support-pages/:slug" element={<SupportPages />} />
+          <Route path="/seller/coupons" element={<ListCoupon />} />
+          <Route path="/seller/coupons/create" element={<CreateCoupon />} />
+          <Route path="/seller/abandoned-carts" element={<AbandonedCarts />} />
+          <Route path="/seller/staff" element={<StaffManagement />} />
+          <Route path="/seller/support-pages" element={<SellerSupportPages />} />
+          <Route path="/seller/support-pages/:slug" element={<SellerSupportPages />} />
+          {/* Settings routes — sidebar Settings parent highlights for /seller/settings/* */}
+          <Route path="/seller/settings" element={<SellerSupportPages />} />
+          <Route path="/seller/settings/faqs" element={<SellerSupportPages />} />
+          <Route path="/seller/settings/privacy-policy" element={<SellerSupportPages />} />
+          <Route path="/seller/settings/terms-conditions" element={<SellerSupportPages />} />
+          <Route path="/seller/profile" element={<Profile />} />
         </Route>
 
         {/* Default Redirect */}

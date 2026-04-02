@@ -18,10 +18,8 @@ import {
   Package,
   ShoppingCart,
   Warehouse,
-  BarChart3,
   Wallet,
   Ticket,
-  MessageSquare,
   Settings,
   FileText,
   LogOut,
@@ -31,7 +29,6 @@ import {
   Sun,
   HelpCircle,
   Shield,
-  BookOpen,
 } from 'lucide-react';
 
 interface NavItem {
@@ -39,6 +36,7 @@ interface NavItem {
   href: string;
   icon: React.ElementType;
   roles: string[];
+  permissions?: string[];
   children?: NavItem[];
 }
 
@@ -46,7 +44,7 @@ interface NavItem {
 const superAdminNavItems: NavItem[] = [
   { label: 'Dashboard', href: '/super-admin', icon: LayoutDashboard, roles: ['super_admin'] },
   {
-    label: 'Admin Management',
+    label: 'Relation Managers',
     href: '/super-admin/admins',
     icon: Shield,
     roles: ['super_admin'],
@@ -81,48 +79,30 @@ const superAdminNavItems: NavItem[] = [
     icon: Warehouse,
     roles: ['super_admin'],
   },
-  {
-    label: 'Sales Reports',
-    href: '/super-admin/reports',
-    icon: BarChart3,
-    roles: ['super_admin'],
-  },
+  // {
+  //   label: 'Sales Reports',
+  //   href: '/super-admin/reports',
+  //   icon: BarChart3,
+  //   roles: ['super_admin'],
+  // },
   {
     label: 'Payout Management',
     href: '/super-admin/payouts',
     icon: Wallet,
     roles: ['super_admin'],
   },
-  {
-    label: 'Coupons',
-    href: '/super-admin/coupons',
-    icon: Ticket,
-    roles: ['super_admin'],
-  },
-  {
-    label: 'Contact Queries',
-    href: '/super-admin/queries',
-    icon: MessageSquare,
-    roles: ['super_admin'],
-  },
-  {
-    label: 'Support Pages',
-    href: '/super-admin/support-pages',
-    icon: BookOpen,
-    roles: ['super_admin'],
-    children: [
-      { label: 'Help Center', href: '/super-admin/support-pages/help-center', icon: HelpCircle, roles: ['super_admin'] },
-      { label: 'FAQs', href: '/super-admin/support-pages/faqs', icon: HelpCircle, roles: ['super_admin'] },
-      { label: 'Privacy Policy', href: '/super-admin/support-pages/privacy-policy', icon: Shield, roles: ['super_admin'] },
-      { label: 'Terms & Conditions', href: '/super-admin/support-pages/terms-conditions', icon: FileText, roles: ['super_admin'] },
-    ],
-  },
-  {
-    label: 'Settings',
-    href: '/super-admin/settings',
-    icon: Settings,
-    roles: ['super_admin'],
-  },
+  // {
+  //   label: 'Coupons',
+  //   href: '/super-admin/coupons',
+  //   icon: Ticket,
+  //   roles: ['super_admin'],
+  // },
+  // {
+  //   label: 'Contact Queries',
+  //   href: '/super-admin/queries',
+  //   icon: MessageSquare,
+  //   roles: ['super_admin'],
+  // },
 ];
 
 // Admin Navigation
@@ -158,12 +138,12 @@ const adminNavItems: NavItem[] = [
     icon: Warehouse,
     roles: ['admin'],
   },
-  {
-    label: 'Sales Reports',
-    href: '/admin/reports',
-    icon: BarChart3,
-    roles: ['admin'],
-  },
+  // {
+  //   label: 'Sales Reports',
+  //   href: '/admin/reports',
+  //   icon: BarChart3,
+  //   roles: ['admin'],
+  // },
   {
     label: 'Payouts',
     href: '/admin/payouts',
@@ -175,77 +155,99 @@ const adminNavItems: NavItem[] = [
     href: '/admin/coupons',
     icon: Ticket,
     roles: ['admin'],
-  },
-  {
-    label: 'Support Pages',
-    href: '/admin/support-pages',
-    icon: BookOpen,
-    roles: ['admin'],
     children: [
-      { label: 'Help Center', href: '/admin/support-pages/help-center', icon: HelpCircle, roles: ['admin'] },
-      { label: 'FAQs', href: '/admin/support-pages/faqs', icon: HelpCircle, roles: ['admin'] },
-      { label: 'Privacy Policy', href: '/admin/support-pages/privacy-policy', icon: Shield, roles: ['admin'] },
-      { label: 'Terms & Conditions', href: '/admin/support-pages/terms-conditions', icon: FileText, roles: ['admin'] },
+      { label: 'List Coupon', href: '/admin/coupons', icon: Ticket, roles: ['admin'] },
+      { label: 'Create Coupon', href: '/admin/coupons/create', icon: ShoppingCart, roles: ['admin'] },
     ],
   },
+  // {
+  //   label: 'Settings',
+  //   href: '/admin/settings',
+  //   icon: Settings,
+  //   roles: ['admin'],
+  //   children: [
+
+  //     { label: 'FAQs', href: '/admin/support-pages/faqs', icon: HelpCircle, roles: ['admin'] },
+  //     { label: 'Privacy Policy', href: '/admin/support-pages/privacy-policy', icon: Shield, roles: ['admin'] },
+  //     { label: 'Terms & Conditions', href: '/admin/support-pages/terms-conditions', icon: FileText, roles: ['admin'] },
+  //   ],
+  // },
 ];
 
 // Seller Navigation
 const sellerNavItems: NavItem[] = [
-  { label: 'Dashboard', href: '/seller', icon: LayoutDashboard, roles: ['seller'] },
+  { label: 'Dashboard', href: '/seller', icon: LayoutDashboard, roles: ['seller', 'staff'] },
   {
     label: 'My Products',
     href: '/seller/products',
     icon: Package,
-    roles: ['seller'],
+    roles: ['seller', 'staff'],
+    permissions: ['manage_products'],
   },
   {
-    label: 'My Inventory',
+    label: 'Categories',
+    href: '/seller/categories',
+    icon: Warehouse,
+    roles: ['seller', 'staff'],
+    permissions: ['manage_categories'],
+  },
+  {
+    label: 'Inventory',
     href: '/seller/inventory',
     icon: Warehouse,
-    roles: ['seller'],
+    roles: ['seller', 'staff'],
+    permissions: ['manage_inventory'],
   },
   {
     label: 'My Orders',
     href: '/seller/orders',
     icon: ShoppingCart,
-    roles: ['seller'],
+    roles: ['seller', 'staff'],
+    permissions: ['manage_orders'],
   },
   {
-    label: 'My Sales',
-    href: '/seller/sales',
-    icon: BarChart3,
-    roles: ['seller'],
+    label: 'Abandoned Carts',
+    href: '/seller/abandoned-carts',
+    icon: ShoppingCart,
+    roles: ['seller', 'staff'],
+    permissions: ['manage_abandoned_carts'],
+  },
+  {
+    label: 'My Staff',
+    href: '/seller/staff',
+    icon: Users,
+    roles: ['seller', 'staff'],
+    permissions: ['manage_staff'],
   },
   {
     label: 'My Payouts',
     href: '/seller/payouts',
     icon: Wallet,
-    roles: ['seller'],
+    roles: ['seller', 'staff'],
+    permissions: ['manage_payouts'],
   },
-  // {
-  //   label: 'My Consumers',
-  //   href: '/seller/consumers',
-  //   icon: Users,
-  //   roles: ['seller'],
-  // },
   {
-    label: 'Support Pages',
-    href: '/seller/support-pages',
-    icon: BookOpen,
-    roles: ['seller'],
+    label: 'Coupons',
+    href: '/seller/coupons',
+    icon: Ticket,
+    roles: ['seller', 'staff'],
+    permissions: ['manage_coupons'],
     children: [
-      { label: 'Help Center', href: '/seller/support-pages/help-center', icon: HelpCircle, roles: ['seller'] },
-      { label: 'FAQs', href: '/seller/support-pages/faqs', icon: HelpCircle, roles: ['seller'] },
-      { label: 'Privacy Policy', href: '/seller/support-pages/privacy-policy', icon: Shield, roles: ['seller'] },
-      { label: 'Terms & Conditions', href: '/seller/support-pages/terms-conditions', icon: FileText, roles: ['seller'] },
+      { label: 'List Coupon', href: '/seller/coupons', icon: Ticket, roles: ['seller', 'staff'], permissions: ['manage_coupons'] },
+      { label: 'Create Coupon ', href: '/seller/coupons/create', icon: ShoppingCart, roles: ['seller', 'staff'], permissions: ['manage_coupons'] },
     ],
   },
   {
-    label: 'Profile',
-    href: '/seller/profile',
+    label: 'Settings',
+    href: '/seller/settings',
     icon: Settings,
-    roles: ['seller'],
+    roles: ['seller', 'staff'],
+    permissions: ['manage_settings'],
+    children: [
+      { label: 'FAQs', href: '/seller/settings/faqs', icon: HelpCircle, roles: ['seller', 'staff'], permissions: ['manage_settings'] },
+      { label: 'Privacy Policy', href: '/seller/settings/privacy-policy', icon: Shield, roles: ['seller', 'staff'], permissions: ['manage_settings'] },
+      { label: 'Terms & Conditions', href: '/seller/settings/terms-conditions', icon: FileText, roles: ['seller', 'staff'], permissions: ['manage_settings'] },
+    ],
   },
 ];
 
@@ -313,15 +315,40 @@ function NavItemComponent({ item, depth = 0 }: { item: NavItem; depth?: number }
 function SidebarContent() {
   const { user, logout } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
-  const { isSuperAdmin, isAdmin, isSeller } = useRole();
+  const { isSuperAdmin, isAdmin, isSeller, isStaff } = useRole();
 
-  const navItems = isSuperAdmin
+  const userPermissions = (user as any)?.permissions || (user as any)?.staffProfile?.permissions || [];
+
+  const filterNavItems = (items: NavItem[]): NavItem[] => {
+    return items.map(item => ({ ...item })).filter(item => {
+      // 1. Check Role
+      if (!item.roles.includes(user?.role || '')) return false;
+      
+      // 2. Check Permissions for Staff
+      if (user?.role === 'staff' && item.permissions) {
+         if (!item.permissions.some(p => userPermissions.includes(p)) && !userPermissions.includes('all')) {
+           return false;
+         }
+      }
+      
+      // Filter children
+      if (item.children) {
+        item.children = filterNavItems(item.children);
+        if (item.children.length === 0) return false;
+      }
+      return true;
+    });
+  };
+
+  const baseItems = isSuperAdmin
     ? superAdminNavItems
     : isAdmin
-    ? adminNavItems
-    : isSeller
-    ? sellerNavItems
-    : [];
+      ? adminNavItems
+      : (isSeller || isStaff)
+        ? sellerNavItems
+        : [];
+
+  const navItems = filterNavItems(baseItems);
 
   return (
     <div className="flex h-full flex-col">

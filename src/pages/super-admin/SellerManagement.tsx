@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, type ReactNode } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { PageHeader } from '@/components/ui/page-header';
 import { DataTable } from '@/components/ui/data-table';
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+// import { Progress } from '@/components/ui/progress';
 import {
   Dialog,
   DialogContent,
@@ -38,6 +38,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { SuccessModal } from '@/components/SuccessModal';
 import { 
   Plus, 
   Edit2, 
@@ -48,18 +49,22 @@ import {
   ShoppingBag,
   IndianRupee,
   Eye,
-  TrendingUp,
   Trash2,
+  Loader2,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
-const createSellerFormSchema = (isSuperAdmin: boolean) => z.object({
+const createSellerFormSchema = (isEdit: boolean = false) => z.object({
   businessName: z.string().min(2, 'Business name must be at least 2 characters'),
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
-  phone: z.string().min(10, 'Phone must be at least 10 digits'),
-  adminEmail: isSuperAdmin 
-    ? z.string().email('Invalid admin email').min(1, 'Admin email is required')
-    : z.string().email('Invalid admin email').optional(),
+  phone: isEdit 
+    ? z.string().transform(v => v || '').refine(v => v === '' || v.length >= 10, 'Phone must be at least 10 digits')
+    : z.string().min(10, 'Phone must be at least 10 digits'),
+  adminEmail: z.string().optional().or(z.literal('')).refine(
+    (val) => !val || val === '' || z.string().email().safeParse(val).success,
+    { message: 'Invalid admin email' }
+  ),
   // commissionRate: z.number().min(0).max(50),
   status: z.enum(['active', 'inactive', 'suspended']),
 });
@@ -68,16 +73,20 @@ type SellerFormValues = z.infer<ReturnType<typeof createSellerFormSchema>>;
 
 export default function SellerManagement() {
   const { user } = useAuthStore();
+  //@ts-ignore
   const isSuperAdmin = user?.role === 'super_admin';
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);
-  const [sellerStats, setSellerStats] = useState<Record<string, { products: number; orders: number }>>({});
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedSeller, setSelectedSeller] = useState<Seller | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [sellerToDelete, setSellerToDelete] = useState<Seller | null>(null);
+  const [isAddingSeller, setIsAddingSeller] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | ReactNode>('');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadSellers = async () => {
@@ -86,32 +95,14 @@ export default function SellerManagement() {
         if (response.success && Array.isArray(response.data)) {
           const list = response.data as Seller[];
           setSellers(list);
-
-          // Load per-seller stats (products/orders) for the activity column
-          const statsEntries = await Promise.all(
-            list.map(async (seller) => {
-              try {
-                const statsRes = await sellersApi.getSellerStats(seller.id);
-                if (statsRes.success && statsRes.data) {
-                  const data = statsRes.data as {
-                    products?: number;
-                    orders?: number;
-                  };
-                  return [seller.id, { products: data.products ?? 0, orders: data.orders ?? 0 }] as const;
-                }
-              } catch (error) {
-                console.error('Failed to load stats for seller', seller.id, error);
-              }
-              return [seller.id, { products: 0, orders: 0 }] as const;
-            }),
-          );
-          setSellerStats(Object.fromEntries(statsEntries));
         } else {
           setSellers([]);
         }
       } catch (error) {
         console.error('Failed to load sellers', error);
         setSellers([]);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -143,10 +134,11 @@ export default function SellerManagement() {
     void loadAdmins();
   }, []);
 
-  const sellerFormSchema = useMemo(() => createSellerFormSchema(isSuperAdmin), [isSuperAdmin]);
+  const createSchema = useMemo(() => createSellerFormSchema(false), []);
+  const editSchema = useMemo(() => createSellerFormSchema(true), []);
 
   const form = useForm<SellerFormValues>({
-    resolver: zodResolver(sellerFormSchema),
+    resolver: zodResolver(createSchema),
     defaultValues: {
       businessName: '',
       name: '',
@@ -159,7 +151,7 @@ export default function SellerManagement() {
   });
 
   const editForm = useForm<SellerFormValues>({
-    resolver: zodResolver(sellerFormSchema),
+    resolver: zodResolver(editSchema),
     defaultValues: {
       businessName: '',
       name: '',
@@ -173,18 +165,13 @@ export default function SellerManagement() {
 
   const handleAddSeller = async (data: SellerFormValues) => {
     try {
-      // For regular admins, use their own email. For super admins, require adminEmail
-      const adminEmail = isSuperAdmin 
-        ? (data.adminEmail || '')
+      setIsAddingSeller(true);
+      // For regular admins, use their own email.
+      // For super admins, use the selected adminEmail or fall back to their own email
+      // (backend requires adminEmail, and super_admin is a valid role for it)
+      const adminEmail = isSuperAdmin
+        ? (data.adminEmail || user?.email || '')
         : (user?.email || '');
-
-      if (!adminEmail) {
-        form.setError('adminEmail', {
-          type: 'manual',
-          message: 'Please select an admin',
-        });
-        return;
-      }
 
       const response = await sellersApi.createSeller({
         email: data.email,
@@ -194,7 +181,7 @@ export default function SellerManagement() {
         businessName: data.businessName,
         businessAddress: '', // Optional - backend will use default if empty
         gstNumber: undefined,
-        adminEmail: adminEmail,
+        adminEmail: adminEmail || undefined, // Always send when available
         // commissionRate: data.commissionRate,
       });
 
@@ -215,14 +202,24 @@ export default function SellerManagement() {
         if (refreshResponse.success && Array.isArray(refreshResponse.data)) {
           setSellers(refreshResponse.data as Seller[]);
         }
+        setSuccessMessage(
+  <>
+    Email 1234579789 has been successfully sent to{" "}
+    <a href={`mailto:${data.email}`} className="text-blue-500 underline">
+      {data.email}
+    </a>{" "}
+    to change the password.
+  </>
+);
+        setIsSuccessModalOpen(true);
       } else {
         // Handle API error response with detailed errors
         let errorMessage = response.message || 'Failed to create seller';
         if (response.errors && Array.isArray(response.errors) && response.errors.length > 0) {
-          const fieldErrors = response.errors.map((e: any) => `${e.field || ''}: ${e.message}`).join('\n');
-          errorMessage = `${errorMessage}\n\n${fieldErrors}`;
+          const fieldErrors = response.errors.map((e: any) => `${e.field || ''}: ${e.message}`).join(', ');
+          errorMessage = `${errorMessage}: ${fieldErrors}`;
         }
-        alert(`Error: ${errorMessage}`);
+        toast.error(errorMessage);
       }
     } catch (error: any) {
       console.error('Failed to create seller', error);
@@ -233,14 +230,16 @@ export default function SellerManagement() {
         const errorData = error.response.data;
         errorMessage = errorData.message || errorMessage;
         if (errorData.errors && Array.isArray(errorData.errors) && errorData.errors.length > 0) {
-          const fieldErrors = errorData.errors.map((e: any) => `${e.field || ''}: ${e.message}`).join('\n');
-          errorMessage = `${errorMessage}\n\n${fieldErrors}`;
+          const fieldErrors = errorData.errors.map((e: any) => `${e.field || ''}: ${e.message}`).join(', ');
+          errorMessage = `${errorMessage}: ${fieldErrors}`;
         }
       } else if (error?.message) {
         errorMessage = error.message;
       }
       
-      alert(`Error: ${errorMessage}`);
+      toast.error(errorMessage);
+    } finally {
+      setIsAddingSeller(false);
     }
   };
 
@@ -259,7 +258,7 @@ export default function SellerManagement() {
       });
 
       if (response.success && response.data) {
-        const updated = response.data as Seller;
+        const updated = { ...selectedSeller, ...(response.data as Seller) };
         setSellers((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
         setIsEditDialogOpen(false);
         setSelectedSeller(null);
@@ -323,10 +322,6 @@ export default function SellerManagement() {
     setIsViewDialogOpen(true);
   };
 
-  const getSellerStats = (sellerId: string) => {
-    return sellerStats[sellerId] || { products: 0, orders: 0 };
-  };
-
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -344,11 +339,9 @@ export default function SellerManagement() {
           const seller = row.original;
           return (
             <div className="flex items-center gap-3">
-              <img
-                src={seller.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${seller.id}`}
-                alt={seller.name}
-                className="h-10 w-10 rounded-full"
-              />
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-semibold flex-shrink-0">
+                {seller.name.charAt(0).toUpperCase()}
+              </div>
               <div>
                 <p className="font-medium text-gray-900 dark:text-white">{seller.businessName}</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">{seller.name}</p>
@@ -388,14 +381,9 @@ export default function SellerManagement() {
         accessorKey: 'totalEarnings',
         header: 'Earnings',
         cell: ({ row }) => (
-          <div>
-            <p className="font-medium text-gray-900 dark:text-white">
-              {formatCurrency(row.original.totalEarnings)}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Available: {formatCurrency(row.original.availableBalance)}
-            </p>
-          </div>
+          <p className="font-medium text-gray-900 dark:text-white">
+            {formatCurrency(row.original.totalEarnings)}
+          </p>
         ),
       },
       {
@@ -407,16 +395,16 @@ export default function SellerManagement() {
         id: 'stats',
         header: 'Activity',
         cell: ({ row }) => {
-          const stats = getSellerStats(row.original.id);
+          const seller = row.original;
           return (
             <div className="flex gap-3">
               <Badge variant="secondary" className="flex items-center gap-1 dark:bg-gray-700">
                 <Package className="h-3 w-3" />
-                {stats.products}
+                {seller.productCount ?? 0}
               </Badge>
               <Badge variant="secondary" className="flex items-center gap-1 dark:bg-gray-700">
                 <ShoppingBag className="h-3 w-3" />
-                {stats.orders}
+                {seller.orderCount ?? 0}
               </Badge>
             </div>
           );
@@ -561,11 +549,11 @@ export default function SellerManagement() {
                       name="adminEmail"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="dark:text-gray-300">Admin Email</FormLabel>
+                          <FormLabel className="dark:text-gray-300">Relation manager(Optional)</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger className="dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-                                <SelectValue placeholder="Select an admin" />
+                                <SelectValue placeholder="Relation manager" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent className="dark:border-gray-700 dark:bg-gray-800">
@@ -630,8 +618,15 @@ export default function SellerManagement() {
                     )}
                   />
                   <DialogFooter>
-                    <Button type="submit" className="bg-gradient-to-r from-orange-500 to-amber-500">
-                      Create Seller
+                    <Button type="submit" className="bg-gradient-to-r from-orange-500 to-amber-500" disabled={isAddingSeller}>
+                      {isAddingSeller ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        'Create Seller'
+                      )}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -695,6 +690,12 @@ export default function SellerManagement() {
         </Card>
       </div>
 
+      <SuccessModal 
+        isOpen={isSuccessModalOpen} 
+        onOpenChange={setIsSuccessModalOpen} 
+        message={successMessage} 
+      />
+
       {/* Sellers Table */}
       <Card className="dark:border-gray-700 dark:bg-gray-800">
         <CardContent className="p-6">
@@ -703,7 +704,8 @@ export default function SellerManagement() {
             data={sellers}
             searchKey="businessName"
             searchPlaceholder="Search sellers..."
-            pageSize={5}
+            pageSize={10}
+            isLoading={isLoading}
           />
         </CardContent>
       </Card>
@@ -720,11 +722,9 @@ export default function SellerManagement() {
           {sellerToDelete && (
             <div className="py-4">
               <div className="flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700">
-                <img
-                  src={sellerToDelete.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${sellerToDelete.id}`}
-                  alt={sellerToDelete.name}
-                  className="h-10 w-10 rounded-full"
-                />
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white font-semibold flex-shrink-0">
+                  {sellerToDelete.name.charAt(0).toUpperCase()}
+                </div>
                 <div>
                   <p className="font-medium text-gray-900 dark:text-white">{sellerToDelete.businessName}</p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">{sellerToDelete.name} • {sellerToDelete.email}</p>
@@ -763,11 +763,9 @@ export default function SellerManagement() {
           {selectedSeller && (
             <div className="space-y-6">
               <div className="flex items-center gap-4">
-                <img
-                  src={selectedSeller.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedSeller.id}`}
-                  alt={selectedSeller.name}
-                  className="h-16 w-16 rounded-full"
-                />
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-amber-500 text-white text-2xl font-semibold shadow-md flex-shrink-0">
+                  {selectedSeller.name.charAt(0).toUpperCase()}
+                </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                     {selectedSeller.businessName}
@@ -786,10 +784,6 @@ export default function SellerManagement() {
                   <p className="text-sm text-gray-600 dark:text-gray-400">Phone</p>
                   <p className="font-medium text-gray-900 dark:text-white">{selectedSeller.phone}</p>
                 </div>
-                {/* <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-700">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Commission Rate</p>
-                  <p className="font-medium text-gray-900 dark:text-white">{selectedSeller.commissionRate}%</p>
-                </div> */}
                 <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-700">
                   <p className="text-sm text-gray-600 dark:text-gray-400">GST Number</p>
                   <p className="font-medium text-gray-900 dark:text-white">{selectedSeller.gstNumber || 'N/A'}</p>
@@ -798,20 +792,35 @@ export default function SellerManagement() {
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="rounded-lg bg-orange-50 p-4 text-center dark:bg-orange-950">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Earnings</p>
-                  <p className="text-xl font-bold text-orange-600 dark:text-orange-400">
-                    {formatCurrency(selectedSeller.totalEarnings)}
+                  <p className="text-sm text-orange-600 dark:text-orange-400">Products</p>
+                  <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">
+                    {selectedSeller.productCount ?? 0}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-blue-50 p-4 text-center dark:bg-blue-950">
+                  <p className="text-sm text-blue-600 dark:text-blue-400">Orders</p>
+                  <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                    {selectedSeller.orderCount ?? 0}
                   </p>
                 </div>
                 <div className="rounded-lg bg-green-50 p-4 text-center dark:bg-green-950">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Available</p>
-                  <p className="text-xl font-bold text-green-600 dark:text-green-400">
+                  <p className="text-sm text-green-600 dark:text-green-400">Total Earnings</p>
+                  <p className="text-xl font-bold text-green-700 dark:text-green-300 line-clamp-1">
+                    {formatCurrency(selectedSeller.totalEarnings)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg bg-emerald-50 p-3 text-center dark:bg-emerald-950/30">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Available Balance</p>
+                  <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
                     {formatCurrency(selectedSeller.availableBalance)}
                   </p>
                 </div>
-                <div className="rounded-lg bg-yellow-50 p-4 text-center dark:bg-yellow-950">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Pending</p>
-                  <p className="text-xl font-bold text-yellow-600 dark:text-yellow-400">
+                <div className="rounded-lg bg-amber-50 p-3 text-center dark:bg-amber-950/30">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Pending Balance</p>
+                  <p className="text-lg font-semibold text-amber-600 dark:text-amber-400">
                     {formatCurrency(selectedSeller.pendingBalance)}
                   </p>
                 </div>

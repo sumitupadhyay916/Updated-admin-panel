@@ -9,23 +9,15 @@ import { ordersApi } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import type { Order } from '@/types';
 import type { ColumnDef } from '@tanstack/react-table';
-import { 
+import {
   ShoppingCart,
   Eye,
   Package,
   Truck,
   CheckCircle,
   XCircle,
-  MoreHorizontal,
 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+
 import {
   Dialog,
   DialogContent,
@@ -147,65 +139,101 @@ export default function OrdersManagement() {
       header: 'Status',
       cell: ({ row }: { row: { original: Order } }) => <StatusBadge status={row.original.orderStatus} />,
     },
-    {
-      accessorKey: 'fulfillmentStatus',
-      header: 'Fulfillment',
-      cell: ({ row }: { row: { original: Order } }) => (
-        <div className="flex items-center gap-2">
-          <StatusBadge status={row.original.fulfillmentStatus} />
-        </div>
-      ),
-    },
+    // {
+    //   accessorKey: 'fulfillmentStatus',
+    //   header: 'Fulfillment',
+    //   cell: ({ row }: { row: { original: Order } }) => (
+    //     <div className="flex items-center gap-2">
+    //       <StatusBadge status={row.original.fulfillmentStatus} />
+    //     </div>
+    //   ),
+    // },
     {
       id: 'actions',
       cell: ({ row }: { row: { original: Order } }) => {
         const order = row.original;
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm">
-                <MoreHorizontal className="h-4 w-4" />
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+              onClick={() => openViewDialog(order)}
+              title="View Details"
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+
+            {order.orderStatus === 'pending' && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                  onClick={() => handleUpdateStatus(order.id, 'confirmed')}
+                  title="Confirm Order"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => handleUpdateStatus(order.id, 'cancelled')}
+                  title="Cancel Order"
+                >
+                  <XCircle className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+
+            {order.orderStatus === 'confirmed' && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                  onClick={() => handleUpdateStatus(order.id, 'processing')}
+                  title="Start Processing"
+                >
+                  <Package className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => handleUpdateStatus(order.id, 'cancelled')}
+                  title="Cancel Order"
+                >
+                  <XCircle className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+
+            {order.orderStatus === 'processing' && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                onClick={() => handleUpdateStatus(order.id, 'shipped')}
+                title="Mark Shipped"
+              >
+                <Truck className="h-4 w-4" />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="dark:border-gray-700 dark:bg-gray-800">
-              <DropdownMenuLabel className="dark:text-gray-300">Actions</DropdownMenuLabel>
-              <DropdownMenuSeparator className="dark:border-gray-700" />
-              <DropdownMenuItem onClick={() => openViewDialog(order)} className="dark:text-gray-300">
-                <Eye className="mr-2 h-4 w-4" />
-                View Details
-              </DropdownMenuItem>
-              {order.orderStatus === 'pending' && (
-                <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'confirmed')} className="dark:text-gray-300">
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Confirm Order
-                </DropdownMenuItem>
-              )}
-              {order.orderStatus === 'confirmed' && (
-                <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'processing')} className="dark:text-gray-300">
-                  <Package className="mr-2 h-4 w-4" />
-                  Start Processing
-                </DropdownMenuItem>
-              )}
-              {order.orderStatus === 'processing' && (
-                <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'shipped')} className="dark:text-gray-300">
-                  <Truck className="mr-2 h-4 w-4" />
-                  Mark Shipped
-                </DropdownMenuItem>
-              )}
-              {order.orderStatus === 'shipped' && (
-                <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'delivered')} className="dark:text-gray-300">
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Mark Delivered
-                </DropdownMenuItem>
-              )}
-              {(order.orderStatus === 'pending' || order.orderStatus === 'confirmed') && (
-                <DropdownMenuItem onClick={() => handleUpdateStatus(order.id, 'cancelled')} className="text-red-600">
-                  <XCircle className="mr-2 h-4 w-4" />
-                  Cancel Order
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            )}
+
+            {order.orderStatus === 'shipped' && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                onClick={() => handleUpdateStatus(order.id, 'delivered')}
+                title="Mark Delivered"
+              >
+                <CheckCircle className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         );
       },
     },
@@ -339,9 +367,19 @@ export default function OrdersManagement() {
                       <div className="flex-1">
                         <p className="font-medium text-gray-900 dark:text-white">{item.productName}</p>
                         <div className="flex flex-wrap gap-2 mt-1">
-                          <Badge variant="outline" className="text-xs dark:border-gray-600">{item.deity}</Badge>
+                          {/* <Badge variant="outline" className="text-xs dark:border-gray-600">{item.deity}</Badge> */}
                           <Badge variant="outline" className="text-xs dark:border-gray-600">{item.material}</Badge>
-                          <Badge variant="outline" className="text-xs dark:border-gray-600">{item.height}"</Badge>
+                          {/* <Badge variant="outline" className="text-xs dark:border-gray-600">{item.height}"</Badge> */}
+                          {item.color && (
+                            <Badge variant="outline" className="text-xs dark:border-gray-600 bg-gray-50 dark:bg-gray-800">
+                              Color: {item.color}
+                            </Badge>
+                          )}
+                          {item.size && (
+                            <Badge variant="outline" className="text-xs dark:border-gray-600 bg-gray-50 dark:bg-gray-800">
+                              Size: {item.size}
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                           Seller: {item.sellerName}

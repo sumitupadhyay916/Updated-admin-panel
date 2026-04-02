@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import { useRole } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+// import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,7 +15,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Bell,
   Search,
   Sun,
   Moon,
@@ -33,16 +33,16 @@ interface HeaderProps {
 
 export function Header({ className, title, showSearch = true }: HeaderProps) {
   const { user, logout } = useAuthStore();
+  const { isSuperAdmin, isAdmin } = useRole();
   const { theme, toggleTheme } = useThemeStore();
 
-  // Mock notifications
-  const notifications = [
-    { id: 1, message: 'New order received #DM-2024-0005', time: '5 min ago', unread: true },
-    { id: 2, message: 'Low stock alert: Brass Ganesha Idol', time: '1 hour ago', unread: true },
-    { id: 3, message: 'Payout processed successfully', time: '2 hours ago', unread: false },
-  ];
+  const profileUrl = isSuperAdmin
+    ? '/super-admin/profile'
+    : isAdmin
+    ? '/admin/profile'
+    : '/seller/profile';
 
-  const unreadCount = notifications.filter(n => n.unread).length;
+  // No active notifications
 
   return (
     <header
@@ -86,7 +86,7 @@ export function Header({ className, title, showSearch = true }: HeaderProps) {
         </Button>
 
         {/* Notifications */}
-        <DropdownMenu>
+        {/* <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative">
               <Bell className="h-5 w-5" />
@@ -119,7 +119,7 @@ export function Header({ className, title, showSearch = true }: HeaderProps) {
               View all notifications
             </DropdownMenuItem>
           </DropdownMenuContent>
-        </DropdownMenu>
+        </DropdownMenu> */}
 
         {/* User Menu */}
         <DropdownMenu>
@@ -145,7 +145,7 @@ export function Header({ className, title, showSearch = true }: HeaderProps) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link to="/profile" className="flex items-center gap-2 cursor-pointer">
+              <Link to={profileUrl} className="flex items-center gap-2 cursor-pointer">
                 <User className="h-4 w-4" />
                 Profile
               </Link>

@@ -1,9 +1,10 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo,type ReactNode } from 'react';
 import { PageHeader } from '@/components/ui/page-header';
 import { DataTable } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { SuccessModal } from '@/components/SuccessModal';
 import {
   Dialog,
   DialogContent,
@@ -29,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+// import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { usersApi, categoriesApi, adminCategoriesApi } from '@/services/api';
 import type { Admin, Category } from '@/types';
@@ -46,6 +47,7 @@ import {
   Shield,
   Phone,
   FolderTree,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -67,6 +69,12 @@ export default function AdminManagement() {
   const [selectedAdmin, setSelectedAdmin] = useState<Admin | null>(null);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+  const [isAddingAdmin, setIsAddingAdmin] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | ReactNode>('');
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [adminToDelete, setAdminToDelete] = useState<Admin | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadAdmins = async () => {
@@ -80,6 +88,8 @@ export default function AdminManagement() {
       } catch (error) {
         console.error('Failed to load admins', error);
         setAdmins([]);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -123,6 +133,7 @@ export default function AdminManagement() {
 
   const handleAddAdmin = async (data: AdminFormValues) => {
     try {
+      setIsAddingAdmin(true);
       const response = await usersApi.createUser({
         email: data.email,
         password: 'Admin@123', // default password for new admins
@@ -137,13 +148,25 @@ export default function AdminManagement() {
         setAdmins((prev) => [...prev, created]);
         setIsAddDialogOpen(false);
         form.reset();
-        toast.success('Admin created successfully');
+          setSuccessMessage(
+  <>
+    Email has been successfully sent to{" "}
+    <a href={`mailto:${data.email}`} className="text-blue-500 underline">
+      {data.email}
+    </a>{" "}
+    to change the password.
+  </>
+);
+    
+        setIsSuccessModalOpen(true);
       } else {
         toast.error(response.message || 'Failed to create admin');
       }
     } catch (error) {
       console.error('Failed to create admin', error);
       toast.error('Failed to create admin');
+    } finally {
+      setIsAddingAdmin(false);
     }
   };
 
@@ -188,14 +211,16 @@ export default function AdminManagement() {
     }
   };
 
-  const handleDeleteAdmin = async (adminId: string) => {
-    if (!confirm('Are you sure you want to delete this admin?')) return;
+  const handleDeleteAdmin = async () => {
+    if (!adminToDelete) return;
 
     try {
-      const response = await usersApi.deleteUser(adminId);
+      const response = await usersApi.deleteUser(adminToDelete.id);
       if (response.success) {
-        setAdmins((prev) => prev.filter((a) => a.id !== adminId));
+        setAdmins((prev) => prev.filter((a) => a.id !== adminToDelete.id));
         toast.success('Admin deleted successfully');
+        setIsDeleteDialogOpen(false);
+        setAdminToDelete(null);
       } else {
         toast.error(response.message || 'Failed to delete admin');
       }
@@ -203,6 +228,11 @@ export default function AdminManagement() {
       console.error('Failed to delete admin', error);
       toast.error('Failed to delete admin');
     }
+  };
+
+  const openDeleteDialog = (admin: Admin) => {
+    setAdminToDelete(admin);
+    setIsDeleteDialogOpen(true);
   };
 
   const openEditDialog = (admin: Admin) => {
@@ -274,8 +304,8 @@ export default function AdminManagement() {
 
   const columns: ColumnDef<Admin>[] = useMemo(() => [
     {
-      accessorKey: 'admin',
-      header: 'Admin',
+      accessorKey: 'name',
+      header: 'RM',
       cell: ({ row }: { row: { original: Admin } }) => {
         const admin = row.original;
         return (
@@ -303,30 +333,30 @@ export default function AdminManagement() {
         </div>
       ),
     },
-    {
-      accessorKey: 'permissions',
-      header: 'Permissions',
-      cell: ({ row }: { row: { original: Admin } }) => {
-        const permissions = row.original.permissions || [];
-        return (
-          <div className="flex flex-wrap gap-1">
-            {permissions.slice(0, 2).map((perm) => (
-              <Badge key={perm} variant="secondary" className="text-xs">
-                {perm}
-              </Badge>
-            ))}
-            {permissions.length > 2 && (
-              <Badge variant="secondary" className="text-xs">
-                +{permissions.length - 2}
-              </Badge>
-            )}
-            {permissions.length === 0 && (
-              <span className="text-xs text-gray-400">No permissions</span>
-            )}
-          </div>
-        );
-      },
-    },
+    // {
+    //   accessorKey: 'permissions',
+    //   header: 'Permissions',
+    //   cell: ({ row }: { row: { original: Admin } }) => {
+    //     const permissions = row.original.permissions || [];
+    //     return (
+    //       <div className="flex flex-wrap gap-1">
+    //         {permissions.slice(0, 2).map((perm) => (
+    //           <Badge key={perm} variant="secondary" className="text-xs">
+    //             {perm}
+    //           </Badge>
+    //         ))}
+    //         {permissions.length > 2 && (
+    //           <Badge variant="secondary" className="text-xs">
+    //             +{permissions.length - 2}
+    //           </Badge>
+    //         )}
+    //         {permissions.length === 0 && (
+    //           <span className="text-xs text-gray-400">No permissions</span>
+    //         )}
+    //       </div>
+    //     );
+    //   },
+    // },
     {
       accessorKey: 'status',
       header: 'Status',
@@ -379,15 +409,15 @@ export default function AdminManagement() {
                 <CheckCircle className="h-4 w-4" />
               )}
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleDeleteAdmin(admin.id)}
-              className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-              title="Delete Admin"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => openDeleteDialog(admin)}
+                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                    title="Delete Admin"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
           </div>
         );
       },
@@ -401,7 +431,7 @@ export default function AdminManagement() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Admin Management"
+        title="Relation Managers"
         description="Manage platform administrators and their permissions"
         icon={Shield}
         actions={
@@ -409,14 +439,14 @@ export default function AdminManagement() {
             <DialogTrigger asChild>
               <Button className="bg-gradient-to-r from-orange-500 to-amber-500">
                 <Plus className="mr-2 h-4 w-4" />
-                Add Admin
+                Add RM's
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px] dark:border-gray-700 dark:bg-gray-800">
               <DialogHeader>
-                <DialogTitle className="dark:text-white">Add New Admin</DialogTitle>
+                <DialogTitle className="dark:text-white">Add New Manager</DialogTitle>
                 <DialogDescription className="dark:text-gray-400">
-                  Create a new administrator account
+                 create a new RM account
                 </DialogDescription>
               </DialogHeader>
               <Form {...form}>
@@ -428,7 +458,7 @@ export default function AdminManagement() {
                       <FormItem>
                         <FormLabel className="dark:text-gray-300">Full Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter admin name" {...field} className="dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                          <Input placeholder="Enter manager name" {...field} className="dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -483,8 +513,15 @@ export default function AdminManagement() {
                     )}
                   />
                   <DialogFooter>
-                    <Button type="submit" className="bg-gradient-to-r from-orange-500 to-amber-500">
-                      Create Admin
+                    <Button type="submit" className="bg-gradient-to-r from-orange-500 to-amber-500" disabled={isAddingAdmin}>
+                      {isAddingAdmin ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        'Create RM'
+                      )}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -531,6 +568,56 @@ export default function AdminManagement() {
         </Card>
       </div>
 
+      <SuccessModal
+        isOpen={isSuccessModalOpen}
+        onOpenChange={setIsSuccessModalOpen}
+        message={successMessage}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px] dark:border-gray-700 dark:bg-gray-800">
+          <DialogHeader>
+            <DialogTitle className="dark:text-white">Delete Admin</DialogTitle>
+            <DialogDescription className="dark:text-gray-400">
+              Are you sure you want to delete this admin? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {adminToDelete && (
+            <div className="py-4">
+              <div className="flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+                  <Shield className="h-6 w-6 text-red-600 dark:text-red-400" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-white">{adminToDelete.name}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{adminToDelete.email}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDeleteDialogOpen(false);
+                setAdminToDelete(null);
+              }}
+              className="dark:border-gray-700 dark:text-gray-300"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteAdmin}
+              className="bg-red-600 text-white hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete Admin
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Admins Table */}
       <Card className="dark:border-gray-700 dark:bg-gray-800">
         <CardContent className="p-6">
@@ -540,6 +627,7 @@ export default function AdminManagement() {
             searchKey="name"
             searchPlaceholder="Search admins..."
             pageSize={10}
+            isLoading={isLoading}
           />
         </CardContent>
       </Card>
