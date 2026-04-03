@@ -7,6 +7,7 @@ import { Toaster } from '@/components/ui/sonner';
 // Auth Pages
 import Login from '@/pages/auth/Login';
 import ActivateSeller from '@/pages/auth/ActivateSeller';
+import ForgotPassword from '@/pages/auth/ForgotPassword';
 
 // Shared Pages
 import Profile from '@/pages/shared/Profile';
@@ -131,6 +132,14 @@ function App() {
             element={
               <PublicRoute>
                 <ActivateSeller />
+              </PublicRoute>
+            } 
+          />
+          <Route 
+            path="/forgot-password" 
+            element={
+              <PublicRoute>
+                <ForgotPassword />
               </PublicRoute>
             } 
           />
