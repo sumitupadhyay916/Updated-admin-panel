@@ -148,6 +148,21 @@ export const authApi = {
     const response = await apiClient.get('/auth/verify-activation-token', { params: { token } });
     return response.data;
   },
+
+  requestPasswordResetOtp: async (data: { email: string }): Promise<ApiResponse<null>> => {
+    const response = await apiClient.post('/auth/request-password-reset-otp', data);
+    return response.data;
+  },
+
+  verifyPasswordResetOtp: async (data: { email: string; otp: string }): Promise<ApiResponse<null>> => {
+    const response = await apiClient.post('/auth/verify-password-reset-otp', data);
+    return response.data;
+  },
+
+  resetPassword: async (data: { email: string; otp: string; newPassword: string }): Promise<ApiResponse<null>> => {
+    const response = await apiClient.post('/auth/reset-password', data);
+    return response.data;
+  },
 };
 
 // ============================================
