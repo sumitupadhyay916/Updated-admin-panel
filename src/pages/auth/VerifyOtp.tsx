@@ -1,39 +1,54 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Sparkles, ArrowLeft } from 'lucide-react';
-import { authApi } from '@/services/api';
+import { Sparkles, ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { authApi } from '@/services/api';
 
-export default function ForgotPassword() {
+export default function VerifyOtp() {
   const navigate = useNavigate();
-  
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  
-  // Form State
-  const [email, setEmail] = useState('');
+  const location = useLocation();
+  const email = location.state?.email || '';
 
-  const handleRequestOtp = async (e: React.FormEvent) => {
+  const [otp, setOtp] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!email) {
+      toast.error('Session expired. Please request a new OTP.');
+      navigate('/forgot-password');
+    }
+  }, [email, navigate]);
+
+  const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setIsLoading(true);
+    const code = otp.replace(/\D/g, '');
+    if (code.length !== 6) {
+      setError('Please enter a valid 6-digit OTP');
+      return;
+    }
 
+    setIsLoading(true);
     try {
-      const response = await authApi.requestPasswordResetOtp({ email });
+      const response = await authApi.verifyPasswordResetOtp({ email, otp: code });
       if (response.success) {
-        toast.success(response.message || 'OTP sent successfully!');
-        // Seamlessly navigate to dedicated OTP verification screen
-        navigate('/verify-otp', { state: { email } });
+        toast.success(response.message || 'OTP verified');
+        navigate('/reset-password', { state: { email, otp: code } });
       } else {
-        setError(response.message || 'Failed to send OTP.');
+        setError(response.message || 'Invalid or expired OTP');
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'An error occurred. Please try again.');
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      setError(message || 'Invalid or expired OTP. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -49,24 +64,25 @@ export default function ForgotPassword() {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white">
-            Forgot Password
+            Verify Your OTP
           </CardTitle>
           <CardDescription className="text-gray-600 dark:text-gray-400">
-            Enter your email to receive a password reset OTP
+            We have sent an OTP to {email}
           </CardDescription>
         </CardHeader>
         
         <CardContent>
-          <form onSubmit={handleRequestOtp} className="space-y-4">
+          <form onSubmit={handleVerify} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email" className="dark:text-gray-300">Email Address</Label>
+              <Label htmlFor="otp" className="dark:text-gray-300">Enter OTP</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="Enter your registered email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                id="otp"
+                type="text"
+                placeholder="6-digit code"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                className="dark:border-gray-700 dark:bg-gray-800 dark:text-white tracking-[0.5em] text-center"
+                maxLength={6}
                 required
               />
             </div>
@@ -79,16 +95,16 @@ export default function ForgotPassword() {
 
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
               disabled={isLoading}
+              className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
             >
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Sending OTP...
+                  Verifying...
                 </>
               ) : (
-                'Get OTP'
+                'Verify OTP'
               )}
             </Button>
           </form>
@@ -97,11 +113,11 @@ export default function ForgotPassword() {
         <CardFooter className="flex flex-col gap-4">
           <div className="w-full text-center">
             <Link 
-              to="/login"
+              to="/forgot-password"
               className="inline-flex items-center text-sm font-medium text-gray-600 hover:text-orange-500 dark:text-gray-400 dark:hover:text-orange-400"
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to login
+              Change Email
             </Link>
           </div>
         </CardFooter>

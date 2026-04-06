@@ -204,7 +204,7 @@ export default function SellerManagement() {
         }
         setSuccessMessage(
   <>
-    Email 1234579789 has been successfully sent to{" "}
+    Email has been successfully sent to{" "}
     <a href={`mailto:${data.email}`} className="text-blue-500 underline">
       {data.email}
     </a>{" "}

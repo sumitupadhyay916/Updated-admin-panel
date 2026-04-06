@@ -8,6 +8,8 @@ import { Toaster } from '@/components/ui/sonner';
 import Login from '@/pages/auth/Login';
 import ActivateSeller from '@/pages/auth/ActivateSeller';
 import ForgotPassword from '@/pages/auth/ForgotPassword';
+import VerifyOtp from '@/pages/auth/VerifyOtp';
+import ResetPassword from '@/pages/auth/ResetPassword';
 
 // Shared Pages
 import Profile from '@/pages/shared/Profile';
@@ -140,6 +142,22 @@ function App() {
             element={
               <PublicRoute>
                 <ForgotPassword />
+              </PublicRoute>
+            } 
+          />
+          <Route 
+            path="/verify-otp" 
+            element={
+              <PublicRoute>
+                <VerifyOtp />
+              </PublicRoute>
+            } 
+          />
+          <Route 
+            path="/reset-password" 
+            element={
+              <PublicRoute>
+                <ResetPassword />
               </PublicRoute>
             } 
           />
