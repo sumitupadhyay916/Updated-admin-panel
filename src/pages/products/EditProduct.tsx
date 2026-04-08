@@ -192,9 +192,9 @@ export default function EditProduct() {
 
           // Set non-variant data
           setNonVariantData({
-            price: prod.price?.toString() || '',
-            comparePrice: prod.comparePrice?.toString() || '',
-            stockQuantity: prod.stockQuantity?.toString() || '0',
+            price: prod.price ? prod.price.toString() : '',
+            comparePrice: prod.comparePrice ? prod.comparePrice.toString() : '',
+            stockQuantity: prod.stockQuantity ? prod.stockQuantity.toString() : '0',
             images: Array.isArray(prod.images) ? prod.images.map((img: any) => typeof img === 'string' ? img : img.url) : [],
           });
 
@@ -874,9 +874,18 @@ export default function EditProduct() {
                                               }} />
                                             </td>
                                           ))}
-                                          <td className="p-1.5"><Input type="number" className="h-8 text-xs min-w-[70px]" value={vRow.price || ''} onChange={e => updateSize(cgIdx, vIdx, { price: parseFloat(e.target.value) || 0 })} /></td>
-                                          <td className="p-1.5"><Input type="number" className="h-8 text-xs min-w-[70px]" value={vRow.mrp || ''} onChange={e => updateSize(cgIdx, vIdx, { mrp: parseFloat(e.target.value) || 0 })} /></td>
-                                          <td className="p-1.5"><Input type="number" className="h-8 text-xs min-w-[60px]" value={vRow.stockQuantity || ''} onChange={e => updateSize(cgIdx, vIdx, { stockQuantity: parseInt(e.target.value, 10) || 0 })} /></td>
+                                                                                     <td className="p-1.5"><Input type="number" className="h-8 text-xs min-w-[70px]" value={vRow.price === 0 && vRow.price !== undefined ? '0' : vRow.price || ''} onChange={e => {
+                                              const val = e.target.value;
+                                              updateSize(cgIdx, vIdx, { price: val === '' ? undefined : (parseFloat(val) as any) });
+                                            }} /></td>
+                                                                                      <td className="p-1.5"><Input type="number" className="h-8 text-xs min-w-[70px]" value={vRow.mrp === 0 && vRow.mrp !== undefined ? '0' : vRow.mrp || ''} onChange={e => {
+                                              const val = e.target.value;
+                                              updateSize(cgIdx, vIdx, { mrp: val === '' ? undefined : (parseFloat(val) as any) });
+                                            }} /></td>
+                                                                                      <td className="p-1.5"><Input type="number" className="h-8 text-xs min-w-[60px]" value={vRow.stockQuantity === 0 && vRow.stockQuantity !== undefined ? '0' : vRow.stockQuantity || ''} onChange={e => {
+                                              const val = e.target.value;
+                                              updateSize(cgIdx, vIdx, { stockQuantity: val === '' ? 0 : (parseInt(val, 10) as any) });
+                                            }} /></td>
                                           <td className="p-1.5">
                                             <Button
                                               type="button"
