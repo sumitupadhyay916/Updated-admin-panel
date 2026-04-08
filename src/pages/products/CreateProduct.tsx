@@ -95,22 +95,22 @@ const productFormSchema = z.object({
   subcategoryId: z.string().optional(),
   sellerId: z.string().optional(),
   hasVariants: z.boolean().default(false),
-  price: z.number().min(0).optional(),
-  comparePrice: z.number().min(0).optional(),
+  price: z.coerce.number().min(0).optional(),
+  comparePrice: z.coerce.number().min(0).optional(),
   stock: z.enum(['available', 'unavailable']),
-  stockQuantity: z.number().min(0).default(0),
+  stockQuantity: z.coerce.number().min(0).default(0),
   variants: z.array(variantItemSchema).optional().default([]),
   brand: z.string().optional(),
   care: z.string().optional(),
   materials: z.string().optional(),
   ageGroups: z.array(z.string()).optional().default([]),
-  isNew: z.boolean().default(false),
+  isNew: z.boolean().default(true),
   isBestseller: z.boolean().default(false),
   isFeatured: z.boolean().default(false),
   dimensions: z.object({
-    h: z.number().optional().default(0),
-    l: z.number().optional().default(0),
-    w: z.number().optional().default(0),
+    h: z.coerce.number().optional().default(0),
+    l: z.coerce.number().optional().default(0),
+    w: z.coerce.number().optional().default(0),
   }).optional().default({ h: 0, l: 0, w: 0 }),
 });
 
@@ -214,6 +214,12 @@ export default function CreateProduct() {
   const [quickAddName, setQuickAddName] = useState('');
   const [showQuickAdd, setShowQuickAdd] = useState(false);
 
+  const [quickAddCategoryName, setQuickAddCategoryName] = useState('');
+  const [quickAddCategoryImage, setQuickAddCategoryImage] = useState('');
+  const [showQuickAddCategory, setShowQuickAddCategory] = useState(false);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [isCategoryImageUploading, setIsCategoryImageUploading] = useState(false);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMode, setSubmitMode] = useState<'draft' | 'publish'>('publish');
   const [editingVariant, setEditingVariant] = useState<{
@@ -233,8 +239,8 @@ export default function CreateProduct() {
       subcategoryId: '',
       sellerId: isSeller ? '' : '__my__',
       hasVariants: false,
-      price: 0,
-      comparePrice: 0,
+      price: undefined,
+      comparePrice: undefined,
       stock: 'available',
       stockQuantity: 0,
       variants: [],
@@ -242,7 +248,7 @@ export default function CreateProduct() {
       care: '',
       materials: '',
       ageGroups: [],
-      isNew: false,
+      isNew: true,
       isBestseller: false,
       isFeatured: false,
       dimensions: { h: 0, l: 0, w: 0 },
@@ -298,6 +304,53 @@ export default function CreateProduct() {
         setQuickAddName('');
       }
     } catch { toast.error('Failed to create subcategory'); }
+  };
+
+  const handleQuickAddCategory = async () => {
+    if (!quickAddCategoryName.trim()) return;
+    setIsAddingCategory(true);
+    try {
+      const payload: { name: string; status: 'active' | 'inactive'; imageUrl?: string } = { 
+        name: quickAddCategoryName.trim(), 
+        status: 'active' 
+      };
+      if (quickAddCategoryImage) {
+        payload.imageUrl = quickAddCategoryImage;
+      }
+      const res = await categoriesApi.createCategory(payload);
+      if (res.success && res.data) {
+        await loadCategories();
+        const newCat = res.data as Category;
+        form.setValue('categoryId', newCat.id.toString());
+        form.setValue('subcategoryId', '');
+        setSubcategories([]);
+        toast.success('Category created');
+        setShowQuickAddCategory(false);
+        setQuickAddCategoryName('');
+        setQuickAddCategoryImage('');
+      } else {
+        toast.error('Failed to create category');
+      }
+    } catch { toast.error('Failed to create category'); }
+    finally { setIsAddingCategory(false); }
+  };
+
+  const handleCategoryImageUpload = async (files: FileList | null) => {
+    if (!files || !files.length) return;
+    setIsCategoryImageUploading(true);
+    try {
+      const result = await productsApi.uploadImage(files[0]);
+      if (result.success && result.data?.url) {
+        setQuickAddCategoryImage(result.data.url);
+        toast.success('Category image uploaded');
+      } else {
+        toast.error('Upload failed');
+      }
+    } catch {
+      toast.error('Upload failed');
+    } finally {
+      setIsCategoryImageUploading(false);
+    }
   };
 
   const handleImageUpload = async (files: FileList | null) => {
@@ -501,10 +554,40 @@ export default function CreateProduct() {
                   <FormField control={form.control} name="categoryId" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Category <span className="text-red-500">*</span></FormLabel>
-                      <Select onValueChange={handleCategoryChange} value={field.value}>
-                        <FormControl><SelectTrigger className="h-11"><SelectValue placeholder="Select category" /></SelectTrigger></FormControl>
-                        <SelectContent>{categories.filter(c => c.status === 'active').map(cat => (<SelectItem key={cat.id} value={cat.id.toString()}>{cat.name}</SelectItem>))}</SelectContent>
-                      </Select>
+                      <div className="flex gap-2">
+                        <Select onValueChange={handleCategoryChange} value={field.value}>
+                          <FormControl><SelectTrigger className="flex-1 h-11"><SelectValue placeholder="Select category" /></SelectTrigger></FormControl>
+                          <SelectContent>{categories.filter(c => c.status === 'active').map(cat => (<SelectItem key={cat.id} value={cat.id.toString()}>{cat.name}</SelectItem>))}</SelectContent>
+                        </Select>
+                        <Button type="button" variant="outline" size="icon" onClick={() => setShowQuickAddCategory(v => !v)} className="h-11 w-11"><Plus className="h-4 w-4" /></Button>
+                      </div>
+                      {showQuickAddCategory && (
+                        <div className="mt-2 p-3 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900 space-y-2">
+                          <div className="flex gap-3">
+                            <div className="flex-1 space-y-2">
+                              <Input placeholder="Category name" value={quickAddCategoryName} onChange={e => setQuickAddCategoryName(e.target.value)} className="h-8 text-sm" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void handleQuickAddCategory(); } }} />
+                              <div className="flex gap-2">
+                                <Button type="button" size="sm" className="h-7 text-xs" onClick={() => void handleQuickAddCategory()} disabled={!quickAddCategoryName.trim() || isAddingCategory}>{isAddingCategory ? 'Adding...' : 'Add'}</Button>
+                                <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setShowQuickAddCategory(false); setQuickAddCategoryName(''); setQuickAddCategoryImage(''); }}>Cancel</Button>
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-center gap-1">
+                              <p className="text-[10px] text-gray-500">Image</p>
+                              {quickAddCategoryImage ? (
+                                <div className="relative w-16 h-16 flex-shrink-0">
+                                  <img src={quickAddCategoryImage} className="w-full h-full rounded-lg object-cover border" alt="Category" />
+                                  <button type="button" className="absolute -top-1 -right-1 p-0.5 bg-red-500 text-white rounded-full shadow" onClick={() => setQuickAddCategoryImage('')}><X className="h-3 w-3" /></button>
+                                </div>
+                              ) : (
+                                <label className="flex items-center justify-center w-16 h-16 rounded-lg border-2 border-dashed cursor-pointer hover:border-indigo-400 flex-shrink-0">
+                                  {isCategoryImageUploading ? <div className="animate-spin w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full" /> : <ImageIcon className="h-4 w-4 text-gray-400" />}
+                                  <input type="file" accept="image/*" className="hidden" disabled={isCategoryImageUploading} onChange={e => { handleCategoryImageUpload(e.target.files); e.target.value = ''; }} />
+                                </label>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )} />
@@ -779,9 +862,18 @@ export default function CreateProduct() {
                                                 }} />
                                               </td>
                                             ))}
-                                            <td className="p-1.5"><Input type="number" className="h-8 text-xs min-w-[70px]" value={vRow.price || ''} onChange={e => updateSize(cgIdx, vIdx, { price: parseFloat(e.target.value) || 0 })} /></td>
-                                            <td className="p-1.5"><Input type="number" className="h-8 text-xs min-w-[70px]" value={vRow.mrp || ''} onChange={e => updateSize(cgIdx, vIdx, { mrp: parseFloat(e.target.value) || 0 })} /></td>
-                                            <td className="p-1.5"><Input type="number" className="h-8 text-xs min-w-[60px]" value={vRow.stockQuantity || ''} onChange={e => updateSize(cgIdx, vIdx, { stockQuantity: parseInt(e.target.value, 10) || 0 })} /></td>
+                                            <td className="p-1.5"><Input type="number" className="h-8 text-xs min-w-[70px]" value={vRow.price === 0 && vRow.price !== undefined ? '0' : vRow.price || ''} onChange={e => {
+                                              const val = e.target.value;
+                                              updateSize(cgIdx, vIdx, { price: val === '' ? undefined : (parseFloat(val) as any) });
+                                            }} /></td>
+                                            <td className="p-1.5"><Input type="number" className="h-8 text-xs min-w-[70px]" value={vRow.mrp === 0 && vRow.mrp !== undefined ? '0' : vRow.mrp || ''} onChange={e => {
+                                              const val = e.target.value;
+                                              updateSize(cgIdx, vIdx, { mrp: val === '' ? undefined : (parseFloat(val) as any) });
+                                            }} /></td>
+                                            <td className="p-1.5"><Input type="number" className="h-8 text-xs min-w-[60px]" value={vRow.stockQuantity === 0 && vRow.stockQuantity !== undefined ? '0' : vRow.stockQuantity || ''} onChange={e => {
+                                              const val = e.target.value;
+                                              updateSize(cgIdx, vIdx, { stockQuantity: val === '' ? 0 : (parseInt(val, 10) as any) });
+                                            }} /></td>
                                             <td className="p-1.5">
                                               <Button
                                                 type="button"
@@ -840,14 +932,14 @@ export default function CreateProduct() {
                       <FormField control={form.control} name="price" render={({ field }) => (
                         <FormItem>
                           <FormLabel>Selling Price (₹) <span className="text-red-500">*</span></FormLabel>
-                          <FormControl><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">₹</span><Input type="number" step="0.01" className="pl-7 h-11" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} value={field.value || 0} /></div></FormControl>
+                          <FormControl><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">₹</span><Input type="number" step="0.01" className="pl-7 h-11" {...field} value={field.value ?? ''} /></div></FormControl>
                           <FormMessage />
                         </FormItem>
                       )} />
                       <FormField control={form.control} name="comparePrice" render={({ field }) => (
                         <FormItem>
                           <FormLabel>MRP (₹)</FormLabel>
-                          <FormControl><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">₹</span><Input type="number" step="0.01" className="pl-7 h-11" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} value={field.value || 0} /></div></FormControl>
+                          <FormControl><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">₹</span><Input type="number" step="0.01" className="pl-7 h-11" {...field} value={field.value ?? ''} /></div></FormControl>
                         </FormItem>
                       )} />
                     </div>
@@ -855,7 +947,7 @@ export default function CreateProduct() {
                     <FormField control={form.control} name="stockQuantity" render={({ field }) => (
                       <FormItem className="max-w-[calc(50%-8px)]">
                         <FormLabel>Initial Quantity</FormLabel>
-                        <FormControl><Input type="number" min="0" step="1" className="h-11" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} value={field.value || 0} /></FormControl>
+                        <FormControl><Input type="number" min="0" step="1" className="h-11" {...field} value={field.value ?? ''} /></FormControl>
                         <FormDescription>Starting stock count</FormDescription>
                       </FormItem>
                     )} />
@@ -905,9 +997,9 @@ export default function CreateProduct() {
                       <FormItem><FormLabel>Care Instructions</FormLabel><FormControl><Input placeholder="Care guidelines" {...field} value={field.value || ''} /></FormControl></FormItem>
                     )} />
                     <div className="grid grid-cols-3 gap-3">
-                      <FormField control={form.control} name="dimensions.l" render={({ field }) => (<FormItem><FormLabel className="text-xs">Len (cm)</FormLabel><FormControl><Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl></FormItem>)} />
-                      <FormField control={form.control} name="dimensions.w" render={({ field }) => (<FormItem><FormLabel className="text-xs">Wid (cm)</FormLabel><FormControl><Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl></FormItem>)} />
-                      <FormField control={form.control} name="dimensions.h" render={({ field }) => (<FormItem><FormLabel className="text-xs">Hei (cm)</FormLabel><FormControl><Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl></FormItem>)} />
+                      <FormField control={form.control} name="dimensions.l" render={({ field }) => (<FormItem><FormLabel className="text-xs">Len (cm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl></FormItem>)} />
+                      <FormField control={form.control} name="dimensions.w" render={({ field }) => (<FormItem><FormLabel className="text-xs">Wid (cm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl></FormItem>)} />
+                      <FormField control={form.control} name="dimensions.h" render={({ field }) => (<FormItem><FormLabel className="text-xs">Hei (cm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl></FormItem>)} />
                     </div>
                   </div>
                 </div>
