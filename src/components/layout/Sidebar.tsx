@@ -189,7 +189,7 @@ const sellerNavItems: NavItem[] = [
     href: '/seller/categories',
     icon: Warehouse,
     roles: ['seller', 'staff'],
-    permissions: ['manage_products'],
+    permissions: ['manage_categories'],
   },
   {
     label: 'Inventory',
@@ -210,7 +210,7 @@ const sellerNavItems: NavItem[] = [
     href: '/seller/abandoned-carts',
     icon: ShoppingCart,
     roles: ['seller', 'staff'],
-    permissions: ['manage_orders'],
+    permissions: ['manage_abandoned_carts'],
   },
   {
     label: 'My Staff',

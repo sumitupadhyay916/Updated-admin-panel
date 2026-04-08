@@ -305,7 +305,7 @@ export default function AdminManagement() {
   const columns: ColumnDef<Admin>[] = useMemo(() => [
     {
       accessorKey: 'name',
-      header: 'Admin',
+      header: 'RM',
       cell: ({ row }: { row: { original: Admin } }) => {
         const admin = row.original;
         return (
@@ -439,14 +439,14 @@ export default function AdminManagement() {
             <DialogTrigger asChild>
               <Button className="bg-gradient-to-r from-orange-500 to-amber-500">
                 <Plus className="mr-2 h-4 w-4" />
-                Add Admin
+                Add RM's
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px] dark:border-gray-700 dark:bg-gray-800">
               <DialogHeader>
-                <DialogTitle className="dark:text-white">Add New Admin</DialogTitle>
+                <DialogTitle className="dark:text-white">Add New Manager</DialogTitle>
                 <DialogDescription className="dark:text-gray-400">
-                  Create a new administrator account
+                 create a new RM account
                 </DialogDescription>
               </DialogHeader>
               <Form {...form}>
@@ -458,7 +458,7 @@ export default function AdminManagement() {
                       <FormItem>
                         <FormLabel className="dark:text-gray-300">Full Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter admin name" {...field} className="dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                          <Input placeholder="Enter manager name" {...field} className="dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -520,7 +520,7 @@ export default function AdminManagement() {
                           Creating...
                         </>
                       ) : (
-                        'Create Admin'
+                        'Create RM'
                       )}
                     </Button>
                   </DialogFooter>

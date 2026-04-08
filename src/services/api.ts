@@ -696,11 +696,13 @@ export const couponsApi = {
 export interface CreateCategoryRequest {
   name: string;
   status?: 'active' | 'inactive';
+  imageUrl?: string;
 }
 
 export interface UpdateCategoryRequest {
   name?: string;
   status?: 'active' | 'inactive';
+  imageUrl?: string;
 }
 
 export const categoriesApi = {
