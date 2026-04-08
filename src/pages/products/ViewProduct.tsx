@@ -46,6 +46,9 @@ interface Product {
   comparePrice?: number;
   stock: 'available' | 'unavailable';
   stockQuantity: number;
+  totalStock?: number;       // variant-aware sum from getProductInventoryDetails
+  availableStock?: number;   // totalStock - cart reservations
+  currentStock?: number;     // raw shelf stock (current remaining after orders)
   lowStockThreshold: number;
   images: string[];
   sellerName: string;
@@ -90,7 +93,9 @@ export default function ViewProduct() {
       
       setLoading(true);
       try {
-        const response = await productsApi.getProductById(id);
+        // Use getProductInventoryDetails so we get variant-aware totalStock,
+        // availableStock, shippingQuantity, deliveredQuantity in one call.
+        const response = await productsApi.getProductInventoryDetails(Number(id));
         if (response.success && response.data) {
           setProduct(response.data as Product);
         } else {
@@ -214,7 +219,16 @@ export default function ViewProduct() {
 
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">Total Stock</h3>
-                <p className="font-medium text-blue-600 text-lg">{(product.stockQuantity || 0)} pcs</p>
+                {/* totalStock = original stock (current + delivered + in-shipping) */}
+                <p className="font-medium text-blue-600 text-lg">
+                  {(product.totalStock ?? product.stockQuantity ?? 0)} pcs
+                </p>
+                {/* Show remaining on shelf if different from total */}
+                {product.totalStock != null && product.currentStock != null && product.totalStock !== product.currentStock && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {product.currentStock} pcs remaining on shelf
+                  </p>
+                )}
               </div>
 
               <div>
@@ -241,7 +255,8 @@ export default function ViewProduct() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {product.hasVariants && product.variants && product.variants.length > 0 ? (
+            {/* Show variant table if product HAS variants in DB (regardless of hasVariants flag) */}
+            {product.variants && product.variants.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border-collapse">
                   <thead>
